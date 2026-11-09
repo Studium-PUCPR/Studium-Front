@@ -52,3 +52,7 @@ npm run dev
 
 - **2026-11-08 (Fix Missing Title in CreateBookingRequest):**
   - Included mandatory `title` parameter in `handleCreateBooking` payload in `BookingSection`, preventing 400 validation error from `Studium-Booking`.
+
+- **2026-11-08 (Fix Catalog Routes for Room Detail & Maintenance):**
+  - Updated room selection to query `GET /api/catalog/rooms/{id}` which contains operating hours, eliminating the 405 error from non-existent `GET /operating-hours`.
+  - Updated maintenance scheduling route to `POST /api/catalog/rooms/{id}/maintenance-blocks`, resolving the 404 error.

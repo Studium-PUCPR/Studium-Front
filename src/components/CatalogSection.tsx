@@ -79,12 +79,10 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
   const handleSelectRoom = async (room: Room) => {
     setSelectedRoom(room);
     try {
-      const resp = await apiRequest<any>(`/api/catalog/rooms/${room.id}/operating-hours`);
+      const resp = await apiRequest<any>(`/api/catalog/rooms/${room.id}`);
       if (resp.ok && resp.data) {
-        const hList = Array.isArray(resp.data)
-          ? resp.data
-          : Array.isArray(resp.data.items)
-          ? resp.data.items
+        const hList = Array.isArray(resp.data.operatingHours)
+          ? resp.data.operatingHours
           : [];
         setOperatingHours(hList);
       } else {
@@ -149,7 +147,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
     const endsAtUtc = endsAt.toISOString();
 
     try {
-      const resp = await apiRequest(`/api/catalog/rooms/${selectedRoom.id}/maintenance`, {
+      const resp = await apiRequest(`/api/catalog/rooms/${selectedRoom.id}/maintenance-blocks`, {
         method: 'POST',
         body: JSON.stringify({
           startsAtUtc,
