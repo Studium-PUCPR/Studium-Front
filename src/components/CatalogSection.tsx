@@ -195,7 +195,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
 
       if (resp.ok) {
         setMessage({
-          text: `✅ Manutenção agendada com sucesso para ${selectedRoom.name}! Evento RoomMaintenanceScheduled publicado via SQS.`,
+          text: `✅ Manutenção agendada com sucesso para ${selectedRoom.name}! Evento RoomMaintenanceScheduled publicado via RabbitMQ.`,
           isError: false,
         });
         fetchCatalogData();

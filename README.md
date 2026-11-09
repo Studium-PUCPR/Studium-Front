@@ -45,7 +45,7 @@ Pre-configured 1-click test accounts:
 3. **👤 Meu Perfil & Gestão de Usuários (`Studium-Users`):**
    - View profile attributes, RA/ID, and 30-day reservation & no-show counters.
    - Update phone number and notification preferences (`PUT /api/users/{id}`).
-   - Admin User Management: search users, filter by role/status, toggle user blocks (which publishes `UserStatusChangedEvent` via SQS), and inspect security audit logs.
+   - Admin User Management: search users, filter by role/status, toggle user blocks (which publishes `UserStatusChangedEvent` via RabbitMQ), and inspect security audit logs.
 4. **🔔 Notificações (`Studium-Notifications`):**
    - Real-time in-app notification feed persisted in **Amazon DynamoDB**.
    - Mark notifications as read.

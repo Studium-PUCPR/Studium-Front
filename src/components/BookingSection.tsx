@@ -229,7 +229,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
 
       if (resp.ok) {
         setMessage({
-          text: `🎉 Reserva #${resp.data?.id?.substring(0, 8)} criada com sucesso! Horário: ${startTime} às ${endTime} (24h). Código Check-in: ${resp.data?.checkInCode || 'N/A'}. Notificação enviada ao SQS.`,
+          text: `🎉 Reserva #${resp.data?.id?.substring(0, 8)} criada com sucesso! Horário: ${startTime} às ${endTime} (24h). Código Check-in: ${resp.data?.checkInCode || 'N/A'}. Notificação enviada ao RabbitMQ.`,
           isError: false,
         });
         loadUserData();

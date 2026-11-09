@@ -140,7 +140,7 @@ export const UsersSection: React.FC<UsersSectionProps> = ({ user }) => {
       });
       if (res.ok) {
         setAdminMsg({
-          text: `Usuário ${isCurrentlyBlocked ? 'desbloqueado' : 'bloqueado'} com sucesso! Evento publicado via SQS.`,
+          text: `Usuário ${isCurrentlyBlocked ? 'desbloqueado' : 'bloqueado'} com sucesso! Evento publicado via RabbitMQ.`,
         });
         setBlockUserId(null);
         loadUsersList();
@@ -283,7 +283,7 @@ export const UsersSection: React.FC<UsersSectionProps> = ({ user }) => {
           <div className="card-header">
             <div>
               <h3>🛡️ Gestão de Usuários (Administrador)</h3>
-              <p className="hint">Consulte status, no-shows e aplique suspensões com sincronização distribuída SQS</p>
+              <p className="hint">Consulte status, no-shows e aplique suspensões com sincronização distribuída RabbitMQ</p>
             </div>
             <button className="btn-secondary btn-sm" onClick={loadUsersList} disabled={loadingUsers}>
               {loadingUsers ? 'Pesquisando...' : 'Recarregar Usuários'}
@@ -398,7 +398,7 @@ export const UsersSection: React.FC<UsersSectionProps> = ({ user }) => {
             <div className="modal-inline">
               <h4>⚠️ Confirmar Bloqueio de Usuário ({blockUserId})</h4>
               <p className="text-sm text-muted">
-                O usuário perderá permissão para novas reservas. O evento <code>UserStatusChangedEvent</code> será publicado no SQS para o Studium-Booking.
+                O usuário perderá permissão para novas reservas. O evento <code>UserStatusChangedEvent</code> será publicado no RabbitMQ para o Studium-Booking.
               </p>
               <div className="form-group">
                 <label>Motivo do Bloqueio:</label>

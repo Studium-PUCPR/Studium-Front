@@ -144,7 +144,7 @@ export const NotificationsSection: React.FC<NotificationsSectionProps> = ({ user
               {unreadCount > 0 && <span className="badge badge-danger">{unreadCount} não lidas</span>}
             </h3>
             <p className="hint">
-              Microserviço <code>Studium-Notifications</code> (Python 3.12 + FastAPI + Amazon DynamoDB + SQS Consumer)
+              Microserviço <code>Studium-Notifications</code> (Python 3.12 + FastAPI + Amazon DynamoDB + RabbitMQ Consumer)
             </p>
           </div>
           <button className="btn-secondary btn-sm" onClick={loadNotifications} disabled={loading}>
@@ -161,7 +161,7 @@ export const NotificationsSection: React.FC<NotificationsSectionProps> = ({ user
             <div className="empty-state">
               <p>📭 Nenhuma notificação encontrada para este usuário.</p>
               <p className="text-muted text-xs">
-                Notificações são geradas automaticamente por eventos assíncronos do Wolverine via SQS ou pelo formulário abaixo.
+                Notificações são geradas automaticamente por eventos assíncronos do Wolverine via RabbitMQ ou pelo formulário abaixo.
               </p>
             </div>
           ) : (
@@ -208,7 +208,7 @@ export const NotificationsSection: React.FC<NotificationsSectionProps> = ({ user
         <div className="card-subpanel mt-4">
           <h4>🧪 Simular / Disparar Notificação Direta (POST /api/notifications/test)</h4>
           <p className="text-xs text-muted">
-            Permite testar a escrita na tabela DynamoDB <code>studium_notifications</code> sem depender do gatilho SQS.
+            Permite testar a escrita na tabela DynamoDB <code>studium_notifications</code> sem depender do gatilho RabbitMQ.
           </p>
           <form onSubmit={handleCreateTest} className="test-notification-form">
             <div className="form-row">

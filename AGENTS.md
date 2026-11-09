@@ -24,7 +24,7 @@ In Kubernetes, `Studium-Front` serves static SPA files and can proxy requests to
 - `src/components/AuthBar.tsx`: User switcher with 1-click buttons for Student, Professor, and Administrator test accounts.
 - `src/components/CatalogSection.tsx`: Building and room explorer, room capacity, equipment details, operating hours, demo data seeder, and maintenance management.
 - `src/components/BookingSection.tsx`: Timeline availability lookup, reservation creation, check-in, check-out, cancellation, waitlist queue, and utilization metrics report.
-- `src/components/UsersSection.tsx`: Profile inspector, notification preference editor, and admin user moderation (block/unblock with SQS sync and audit logs).
+- `src/components/UsersSection.tsx`: Profile inspector, notification preference editor, and admin user moderation (block/unblock with RabbitMQ sync and audit logs).
 - `src/components/NotificationsSection.tsx`: In-app notification viewer backed by DynamoDB, mark-as-read, and manual test notification generator.
 - `src/components/ConsoleInspector.tsx`: Collapsible bottom drawer displaying real-time HTTP requests, response statuses, and payloads.
 - `src/components/ErrorBoundary.tsx`: React error boundary preventing white-screen crashes from unexpected API response formats.
@@ -42,22 +42,10 @@ npm run dev
 ```
 
 ## 6. Changelog
-- **2026-11-08:** Initialized React 18 + TypeScript + Vite project with NGINX reverse-proxy, Dockerfile, Kubernetes manifests, unified NGINX Ingress rules, and GitHub Actions CI/CD.
-- **2026-11-08:** Fixed `rooms.map` crash by safely unwrapping `PagedResponse` (`data.items` vs direct array) across Catalog, Booking, Users, and Notifications sections; added React `ErrorBoundary` and demo catalog data seeder.
-
-- **2026-11-08 (Direct Classroom Reservation & Date/Time Pickers):**
-  - Added instant reservation form directly inside `CatalogSection` so clicking any room allows immediate reservation without switching tabs.
-  - Added dynamic date, start-time, and duration pickers defaulting to valid campus operating hours (07:00 - 22:30), preventing `409 Outside operating hours` rejections.
-  - Added catalog room dropdown selector in `BookingSection` and hooked up tab switching with pre-selected rooms.
-
-- **2026-11-08 (Fix Missing Title in CreateBookingRequest):**
-  - Included mandatory `title` parameter in `handleCreateBooking` payload in `BookingSection`, preventing 400 validation error from `Studium-Booking`.
-
-- **2026-11-08 (Fix Catalog Routes for Room Detail & Maintenance):**
-  - Updated room selection to query `GET /api/catalog/rooms/{id}` which contains operating hours, eliminating the 405 error from non-existent `GET /operating-hours`.
-  - Updated maintenance scheduling route to `POST /api/catalog/rooms/{id}/maintenance-blocks`, resolving the 404 error.
-
+- **2026-11-09 (Migrate Messaging Labels to RabbitMQ):**
+  - Updated all UI notifications, feedback badges, and tooltips in `CatalogSection`, `BookingSection`, `UsersSection`, and `NotificationsSection` to reflect RabbitMQ messaging.
+  - SQS version preserved on branch `origin/sqs`.
 - **2026-11-08 (24h Time Format & Role-Based Duration Limits):**
-  - Removed all AM/PM time formatting across all components (`api.ts`, `BookingSection`, `CatalogSection`, `NotificationsSection`, `UsersSection`), standardizing strictly on 24h `HH:mm` format.
+  - Standardized strictly on 24h `HH:mm` format.
   - Replaced fixed duration selector with 24h start-time and end-time inputs with dynamic duration calculation.
-  - Implemented client-side duration validation: restricts Students to max 2 hours (120 minutes) and Professors/Admins to max 5 hours (300 minutes), with live feedback badges and disabled submit button on invalid intervals.
+  - Implemented client-side duration validation: restricts Students to max 2 hours and Professors/Admins to max 5 hours.
