@@ -154,11 +154,14 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
     try {
       const startsAt = new Date(`${date}T${startTime}:00`);
       const endsAt = new Date(startsAt.getTime() + durationHours * 60 * 60 * 1000);
+      const selectedRoom = availableRooms.find((r) => r.id === roomId);
+      const bookingTitle = selectedRoom ? `${selectedRoom.name} (${selectedRoom.code})` : `Reserva ${purpose}`;
 
       const resp = await apiRequest('/api/bookings', {
         method: 'POST',
         body: JSON.stringify({
           roomId,
+          title: bookingTitle,
           startsAtUtc: startsAt.toISOString(),
           endsAtUtc: endsAt.toISOString(),
           purpose,

@@ -49,3 +49,6 @@ npm run dev
   - Added instant reservation form directly inside `CatalogSection` so clicking any room allows immediate reservation without switching tabs.
   - Added dynamic date, start-time, and duration pickers defaulting to valid campus operating hours (07:00 - 22:30), preventing `409 Outside operating hours` rejections.
   - Added catalog room dropdown selector in `BookingSection` and hooked up tab switching with pre-selected rooms.
+
+- **2026-11-08 (Fix Missing Title in CreateBookingRequest):**
+  - Included mandatory `title` parameter in `handleCreateBooking` payload in `BookingSection`, preventing 400 validation error from `Studium-Booking`.
