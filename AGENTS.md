@@ -22,11 +22,12 @@ In Kubernetes, `Studium-Front` serves static SPA files and can proxy requests to
 - `src/services/cognito.ts`: Handles Amazon Cognito authentication (`InitiateAuth` with `USER_PASSWORD_AUTH`), token storage in `localStorage`, and JWT payload claims extraction.
 - `src/services/api.ts`: Centralized `fetch` wrapper that injects `Authorization: Bearer <token>` and notifies the live console listener.
 - `src/components/AuthBar.tsx`: User switcher with 1-click buttons for Student, Professor, and Administrator test accounts.
-- `src/components/CatalogSection.tsx`: Building and room explorer, room capacity, equipment details, operating hours, and maintenance management.
+- `src/components/CatalogSection.tsx`: Building and room explorer, room capacity, equipment details, operating hours, demo data seeder, and maintenance management.
 - `src/components/BookingSection.tsx`: Timeline availability lookup, reservation creation, check-in, check-out, cancellation, waitlist queue, and utilization metrics report.
 - `src/components/UsersSection.tsx`: Profile inspector, notification preference editor, and admin user moderation (block/unblock with SQS sync and audit logs).
 - `src/components/NotificationsSection.tsx`: In-app notification viewer backed by DynamoDB, mark-as-read, and manual test notification generator.
 - `src/components/ConsoleInspector.tsx`: Collapsible bottom drawer displaying real-time HTTP requests, response statuses, and payloads.
+- `src/components/ErrorBoundary.tsx`: React error boundary preventing white-screen crashes from unexpected API response formats.
 
 ## 5. Build & Test Commands
 ```bash
@@ -42,3 +43,4 @@ npm run dev
 
 ## 6. Changelog
 - **2026-11-08:** Initialized React 18 + TypeScript + Vite project with NGINX reverse-proxy, Dockerfile, Kubernetes manifests, unified NGINX Ingress rules, and GitHub Actions CI/CD.
+- **2026-11-08:** Fixed `rooms.map` crash by safely unwrapping `PagedResponse` (`data.items` vs direct array) across Catalog, Booking, Users, and Notifications sections; added React `ErrorBoundary` and demo catalog data seeder.

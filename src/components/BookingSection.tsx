@@ -29,15 +29,40 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
   }, [selectedRoomFromCatalog]);
 
   const loadUserData = async () => {
+    if (!user) {
+      setBookings([]);
+      setWaitlist([]);
+      return;
+    }
     setLoading(true);
     try {
-      const bResp = await apiRequest<Booking[]>('/api/bookings');
-      if (bResp.ok) setBookings(bResp.data);
+      const bResp = await apiRequest<any>('/api/bookings');
+      if (bResp.ok && bResp.data) {
+        const bList = Array.isArray(bResp.data)
+          ? bResp.data
+          : Array.isArray(bResp.data.items)
+          ? bResp.data.items
+          : [];
+        setBookings(bList);
+      } else {
+        setBookings([]);
+      }
 
-      const wResp = await apiRequest<WaitlistEntry[]>('/api/bookings/waitlist');
-      if (wResp.ok) setWaitlist(wResp.data);
+      const wResp = await apiRequest<any>('/api/bookings/waitlist');
+      if (wResp.ok && wResp.data) {
+        const wList = Array.isArray(wResp.data)
+          ? wResp.data
+          : Array.isArray(wResp.data.items)
+          ? wResp.data.items
+          : [];
+        setWaitlist(wList);
+      } else {
+        setWaitlist([]);
+      }
     } catch (e: any) {
       setMessage(`Erro ao carregar reservas: ${e.message}`);
+      setBookings([]);
+      setWaitlist([]);
     } finally {
       setLoading(false);
     }
@@ -52,12 +77,24 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
     if (!id) return;
     try {
       const sResp = await apiRequest<any>(`/api/bookings/rooms/${id}/status`);
-      if (sResp.ok) setRoomStatus(sResp.data?.status || 'Unknown');
+      if (sResp.ok && sResp.data) {
+        setRoomStatus(sResp.data?.status || 'Unknown');
+      }
 
-      const tResp = await apiRequest<RoomTimelineSlot[]>(`/api/bookings/rooms/${id}/timeline`);
-      if (tResp.ok) setTimeline(tResp.data);
+      const tResp = await apiRequest<any>(`/api/bookings/rooms/${id}/timeline`);
+      if (tResp.ok && tResp.data) {
+        const tList = Array.isArray(tResp.data)
+          ? tResp.data
+          : Array.isArray(tResp.data.items)
+          ? tResp.data.items
+          : [];
+        setTimeline(tList);
+      } else {
+        setTimeline([]);
+      }
     } catch (e: any) {
       setRoomStatus(`Erro: ${e.message}`);
+      setTimeline([]);
     }
   };
 

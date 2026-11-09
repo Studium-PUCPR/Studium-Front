@@ -110,10 +110,16 @@ export const UsersSection: React.FC<UsersSectionProps> = ({ user }) => {
       if (roleFilter) query += `&role=${encodeURIComponent(roleFilter)}`;
       if (blockedFilter !== '') query += `&isBlocked=${blockedFilter}`;
 
-      const res = await apiRequest<{ items: any[]; totalCount: number }>(query);
+      const res = await apiRequest<any>(query);
       if (res.ok && res.data) {
-        setUsersList(res.data.items || []);
+        const uList = Array.isArray(res.data?.items)
+          ? res.data.items
+          : Array.isArray(res.data)
+          ? res.data
+          : [];
+        setUsersList(uList);
       } else {
+        setUsersList([]);
         setAdminMsg({ text: `Erro ao listar usuários (${res.status})`, isError: true });
       }
     } catch (err: any) {

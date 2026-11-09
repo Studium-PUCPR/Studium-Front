@@ -41,9 +41,15 @@ export const NotificationsSection: React.FC<NotificationsSectionProps> = ({ user
       }>(`/api/notifications?user_id=${user.sub}&limit=50`);
 
       if (res.ok && res.data) {
-        setNotifications(res.data.items || []);
+        const nList = Array.isArray(res.data?.items)
+          ? res.data.items
+          : Array.isArray(res.data)
+          ? res.data
+          : [];
+        setNotifications(nList);
         setUnreadCount(res.data.unread_count || 0);
       } else {
+        setNotifications([]);
         setErrorMsg(`Erro ao carregar notificações (${res.status})`);
       }
     } catch (err: any) {
