@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: studium-ingress
+  namespace: studium
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /api/users
+        pathType: Prefix
+        backend:
+          service:
+            name: studium-users-service
+            port:
+              number: 80
+      - path: /api/catalog
+        pathType: Prefix
+        backend:
+          service:
+            name: studium-catalog-service
+            port:
+              number: 80
+      - path: /api/bookings
+        pathType: Prefix
+        backend:
+          service:
+            name: studium-booking-service
+            port:
+              number: 80
+      - path: /api/notifications
+        pathType: Prefix
+        backend:
+          service:
+            name: studium-notifications-service
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: studium-front-service
+            port:
+              number: 80

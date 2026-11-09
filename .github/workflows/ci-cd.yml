@@ -1,0 +1,90 @@
+name: Build & Deploy Studium-Front
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    name: Build & Lint React App
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: package.json
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Build (TypeScript + Vite)
+        run: npm run build
+
+  build-and-deploy:
+    name: Build Docker Image & Deploy to EKS
+    needs: test-and-build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-2' }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Docker Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: studium-front
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Update Kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig --name studium-eks-cluster --region ${{ secrets.AWS_REGION || 'us-east-2' }}
+
+      - name: Deploy to Kubernetes & Configure Ingress
+        run: |
+          sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" k8s/deployment.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/ingress.yaml
+          kubectl rollout status deployment/studium-front -n studium --timeout=300s
+
+      - name: Debug Kubernetes Pods on Failure
+        if: failure()
+        run: |
+          echo "=== POD STATUS ==="
+          kubectl get pods -n studium -o wide || true
+          echo "=== INGRESS STATUS ==="
+          kubectl get ingress -n studium -o wide || true
+          echo "=== EVENTS ==="
+          kubectl get events -n studium --sort-by='.metadata.creationTimestamp' || true
+          echo "=== POD DESCRIBE ==="
+          kubectl describe pods -n studium -l app=studium-front || true
