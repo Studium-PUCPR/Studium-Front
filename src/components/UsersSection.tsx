@@ -449,7 +449,9 @@ export const UsersSection: React.FC<UsersSectionProps> = ({ user }) => {
                   <tbody>
                     {auditLogs.map((log) => (
                       <tr key={log.id}>
-                        <td className="text-xs">{new Date(log.createdAtUtc).toLocaleString()}</td>
+                        <td className="text-xs">
+                          {`${new Date(log.createdAtUtc).toLocaleDateString('pt-BR')} ${new Date(log.createdAtUtc).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false })}`}
+                        </td>
                         <td>
                           <span className="badge badge-info">{log.action}</span>
                         </td>

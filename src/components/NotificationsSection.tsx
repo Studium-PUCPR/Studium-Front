@@ -176,7 +176,9 @@ export const NotificationsSection: React.FC<NotificationsSectionProps> = ({ user
                     <strong className="notification-title">{n.title}</strong>
                   </div>
                   <span className="notification-time text-xs text-muted">
-                    {n.created_at ? new Date(n.created_at).toLocaleString() : ''}
+                    {n.created_at
+                      ? `${new Date(n.created_at).toLocaleDateString('pt-BR')} ${new Date(n.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false })}`
+                      : ''}
                   </span>
                 </div>
                 <p className="notification-body">{n.message}</p>

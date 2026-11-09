@@ -16,7 +16,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [occupancyReport, setOccupancyReport] = useState<any | null>(null);
 
-  // Date and Time pickers
+  // Date and Time pickers (24h)
   const getInitialDate = () => {
     const d = new Date();
     if (d.getHours() >= 20) {
@@ -27,10 +27,65 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
 
   const [date, setDate] = useState(getInitialDate());
   const [startTime, setStartTime] = useState('10:00');
-  const [durationHours, setDurationHours] = useState(2);
+  const [endTime, setEndTime] = useState('12:00');
   const [purpose, setPurpose] = useState('Sessão de Estudos em Grupo');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  const calculateDurationMinutes = (startStr: string, endStr: string) => {
+    if (!startStr || !endStr) return 0;
+    const [sh, sm] = startStr.split(':').map(Number);
+    const [eh, em] = endStr.split(':').map(Number);
+    return (eh * 60 + em) - (sh * 60 + sm);
+  };
+
+  const currentDurationMinutes = calculateDurationMinutes(startTime, endTime);
+
+  const validateDuration = (minutes: number, role?: string) => {
+    if (minutes <= 0) {
+      return { valid: false, message: 'Horário de término deve ser posterior ao horário de início.' };
+    }
+    if (minutes < 15) {
+      return { valid: false, message: 'Duração mínima permitida: 15 minutos.' };
+    }
+    const maxMinutes = role === 'Professor' || role === 'Administrator' ? 300 : 120;
+    const roleLimitDesc = role === 'Professor' ? '5 horas (Professor)' : role === 'Administrator' ? '5 horas (Admin)' : '2 horas (Estudante)';
+
+    if (minutes > maxMinutes) {
+      return {
+        valid: false,
+        message: `Limite excedido para ${roleLimitDesc}. Selecionado: ${Math.floor(minutes / 60)}h ${minutes % 60}m.`,
+      };
+    }
+
+    return {
+      valid: true,
+      message: `Duração calculada: ${Math.floor(minutes / 60)}h ${minutes % 60 ? `${minutes % 60}m` : '00m'} (Permitido: máx ${roleLimitDesc})`,
+    };
+  };
+
+  const durationValidation = validateDuration(currentDurationMinutes, user?.role);
+
+  // Helper for strictly 24-hour time formatting (no AM/PM)
+  const formatTime24h = (isoString: string) => {
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch {
+      return isoString;
+    }
+  };
+
+  const formatDateTime24h = (isoString: string) => {
+    try {
+      const d = new Date(isoString);
+      const datePart = d.toLocaleDateString('pt-BR');
+      const timePart = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      return `${datePart} às ${timePart}`;
+    } catch {
+      return isoString;
+    }
+  };
 
   // Load available rooms from Catalog for easy dropdown selection
   useEffect(() => {
@@ -147,13 +202,17 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
       setMessage({ text: '⚠️ Faça login com um usuário no topo antes de reservar.', isError: true });
       return;
     }
+    if (!durationValidation.valid) {
+      setMessage({ text: `⚠️ ${durationValidation.message}`, isError: true });
+      return;
+    }
 
     setLoading(true);
     setMessage(null);
 
     try {
       const startsAt = new Date(`${date}T${startTime}:00`);
-      const endsAt = new Date(startsAt.getTime() + durationHours * 60 * 60 * 1000);
+      const endsAt = new Date(`${date}T${endTime}:00`);
       const selectedRoom = availableRooms.find((r) => r.id === roomId);
       const bookingTitle = selectedRoom ? `${selectedRoom.name} (${selectedRoom.code})` : `Reserva ${purpose}`;
 
@@ -170,7 +229,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
 
       if (resp.ok) {
         setMessage({
-          text: `🎉 Reserva #${resp.data?.id?.substring(0, 8)} criada com sucesso! Código Check-in: ${resp.data?.checkInCode || 'N/A'}. Notificação e evento enviados ao SQS.`,
+          text: `🎉 Reserva #${resp.data?.id?.substring(0, 8)} criada com sucesso! Horário: ${startTime} às ${endTime} (24h). Código Check-in: ${resp.data?.checkInCode || 'N/A'}. Notificação enviada ao SQS.`,
           isError: false,
         });
         loadUserData();
@@ -254,11 +313,15 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
 
   const handleJoinWaitlist = async () => {
     if (!roomId) return;
+    if (!durationValidation.valid) {
+      setMessage({ text: `⚠️ ${durationValidation.message}`, isError: true });
+      return;
+    }
     setLoading(true);
     setMessage(null);
 
     const startsAt = new Date(`${date}T${startTime}:00`);
-    const endsAt = new Date(startsAt.getTime() + durationHours * 60 * 60 * 1000);
+    const endsAt = new Date(`${date}T${endTime}:00`);
 
     try {
       const resp = await apiRequest('/api/bookings/waitlist', {
@@ -347,7 +410,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
       <div className="grid-cards" style={{ gridTemplateColumns: '1.2fr 1fr' }}>
         {/* Reservation Creation Box */}
         <div className="sub-card">
-          <h4>Nova Reserva & Agendamento</h4>
+          <h4>Nova Reserva & Agendamento (24h)</h4>
 
           {/* Room Selector Dropdown */}
           <div className="form-group">
@@ -386,7 +449,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
             </div>
           )}
 
-          {/* Date and Time pickers */}
+          {/* Date and 24h Time pickers */}
           <div className="form-row">
             <label>
               Data:
@@ -399,67 +462,69 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
               />
             </label>
             <label>
-              Horário Início:
+              Início (24h):
               <input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                style={{ marginLeft: '6px' }}
+                style={{ marginLeft: '6px', width: '105px' }}
+                required
+              />
+            </label>
+            <label>
+              Término (24h):
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                style={{ marginLeft: '6px', width: '105px' }}
                 required
               />
             </label>
           </div>
 
-          <div className="form-row">
-            <label>
-              Duração:
-              <select
-                value={durationHours}
-                onChange={(e) => setDurationHours(parseInt(e.target.value))}
-                style={{ marginLeft: '6px' }}
-              >
-                <option value={1}>1 hora</option>
-                <option value={2}>2 horas (padrão)</option>
-                <option value={4}>4 horas (professores)</option>
-              </select>
-            </label>
-            <label style={{ flex: 1 }}>
-              Finalidade:
-              <input
-                type="text"
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
-                className="full-width"
-                style={{ marginLeft: '6px' }}
-              />
-            </label>
+          {/* Dynamic Duration Validation Status */}
+          <div style={{ margin: '8px 0', fontSize: '0.82rem' }}>
+            <span className={`badge ${durationValidation.valid ? 'badge-success' : 'badge-danger'}`}>
+              {durationValidation.message}
+            </span>
+          </div>
+
+          <div className="form-group" style={{ marginTop: '8px' }}>
+            <label>Finalidade:</label>
+            <input
+              type="text"
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              className="full-width"
+            />
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button
               onClick={handleCreateBooking}
-              disabled={loading || !roomId}
+              disabled={loading || !roomId || !durationValidation.valid}
               className="btn-primary"
             >
               📅 Confirmar Reserva
             </button>
             <button
               onClick={handleJoinWaitlist}
-              disabled={loading || !roomId}
+              disabled={loading || !roomId || !durationValidation.valid}
               className="btn-warning btn-sm"
             >
               📋 Fila de Espera
             </button>
           </div>
 
-          {/* Timeline Visualizer */}
+          {/* Timeline Visualizer in 24h */}
           {safeTimeline.length > 0 && (
             <div className="card-subpanel mt-4">
-              <strong className="text-xs">Grade de Horários da Sala:</strong>
+              <strong className="text-xs">Grade de Horários da Sala (24h):</strong>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                 {safeTimeline.slice(0, 5).map((slot, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', padding: '4px 8px', background: '#ffffff', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                    <span>{new Date(slot.startsAtUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(slot.endsAtUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span>{formatTime24h(slot.startsAtUtc)} às {formatTime24h(slot.endsAtUtc)} (24h)</span>
                     <span className={`badge ${slot.status === 'Available' ? 'badge-success' : slot.status === 'Maintenance' ? 'badge-danger' : 'badge-warning'}`}>
                       {slot.status}
                     </span>
@@ -470,7 +535,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
           )}
         </div>
 
-        {/* My Active Bookings */}
+        {/* My Active Bookings in 24h */}
         <div className="sub-card">
           <h4>Minhas Reservas Ativas ({safeBookings.length})</h4>
           <div className="bookings-scroll-list" style={{ maxHeight: '420px', overflowY: 'auto' }}>
@@ -494,7 +559,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
                     </span>
                   </div>
                   <div className="text-muted text-xs" style={{ margin: '6px 0' }}>
-                    Início: {new Date(b.startsAtUtc).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} | Fim: {new Date(b.endsAtUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    Horário: {formatDateTime24h(b.startsAtUtc)} até {formatTime24h(b.endsAtUtc)} (24h)
                   </div>
                   {b.checkInCode && (
                     <div style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', marginBottom: '8px' }}>

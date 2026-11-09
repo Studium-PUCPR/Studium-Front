@@ -21,7 +21,6 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
   // Direct room reservation state in Catalog
   const getInitialDate = () => {
     const d = new Date();
-    // If past 20:00, default to tomorrow
     if (d.getHours() >= 20) {
       d.setDate(d.getDate() + 1);
     }
@@ -30,9 +29,43 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
 
   const [bookingDate, setBookingDate] = useState(getInitialDate());
   const [bookingStartTime, setBookingStartTime] = useState('10:00');
-  const [bookingDuration, setBookingDuration] = useState(2);
+  const [bookingEndTime, setBookingEndTime] = useState('12:00');
   const [bookingPurpose, setBookingPurpose] = useState('Estudos e Trabalho Acadêmico');
   const [bookingLoading, setBookingLoading] = useState(false);
+
+  const calculateDurationMinutes = (startStr: string, endStr: string) => {
+    if (!startStr || !endStr) return 0;
+    const [sh, sm] = startStr.split(':').map(Number);
+    const [eh, em] = endStr.split(':').map(Number);
+    return (eh * 60 + em) - (sh * 60 + sm);
+  };
+
+  const currentDurationMinutes = calculateDurationMinutes(bookingStartTime, bookingEndTime);
+
+  const validateDuration = (minutes: number, role?: string) => {
+    if (minutes <= 0) {
+      return { valid: false, message: 'Horário de término deve ser após o horário de início.' };
+    }
+    if (minutes < 15) {
+      return { valid: false, message: 'Duração mínima permitida: 15 minutos.' };
+    }
+    const maxMinutes = role === 'Professor' || role === 'Administrator' ? 300 : 120;
+    const roleLimitDesc = role === 'Professor' ? '5 horas (Professor)' : role === 'Administrator' ? '5 horas (Admin)' : '2 horas (Estudante)';
+
+    if (minutes > maxMinutes) {
+      return {
+        valid: false,
+        message: `Limite excedido: máximo ${roleLimitDesc}. Selecionado: ${Math.floor(minutes / 60)}h ${minutes % 60}m.`,
+      };
+    }
+
+    return {
+      valid: true,
+      message: `Duração calculada: ${Math.floor(minutes / 60)}h ${minutes % 60 ? `${minutes % 60}m` : '00m'} (Permitido: máx ${roleLimitDesc})`,
+    };
+  };
+
+  const durationValidation = validateDuration(currentDurationMinutes, user?.role);
 
   const fetchCatalogData = async () => {
     setLoading(true);
@@ -101,28 +134,32 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
       return;
     }
 
+    if (!durationValidation.valid) {
+      setMessage({ text: `⚠️ ${durationValidation.message}`, isError: true });
+      return;
+    }
+
     setBookingLoading(true);
     setMessage(null);
 
     try {
-      // Build ISO UTC datetime from local date + time
       const startsAtLocal = new Date(`${bookingDate}T${bookingStartTime}:00`);
-      const endsAtLocal = new Date(startsAtLocal.getTime() + bookingDuration * 60 * 60 * 1000);
+      const endsAtLocal = new Date(`${bookingDate}T${bookingEndTime}:00`);
 
       const resp = await apiRequest('/api/bookings', {
         method: 'POST',
         body: JSON.stringify({
           roomId: selectedRoom.id,
+          title: `${selectedRoom.name} (${selectedRoom.code})`,
           startsAtUtc: startsAtLocal.toISOString(),
           endsAtUtc: endsAtLocal.toISOString(),
-          title: selectedRoom.name,
           purpose: bookingPurpose,
         }),
       });
 
       if (resp.ok) {
         setMessage({
-          text: `🎉 Reserva criada com sucesso para ${selectedRoom.name}! Código Check-in: ${resp.data?.checkInCode || 'N/A'}. Acompanhe na aba "Minhas Reservas".`,
+          text: `🎉 Reserva criada com sucesso para ${selectedRoom.name}! Horário: ${bookingStartTime} às ${bookingEndTime} (24h). Código Check-in: ${resp.data?.checkInCode || 'N/A'}.`,
           isError: false,
         });
       } else {
@@ -336,13 +373,19 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
                 <span className="badge badge-info">Capacidade: {selectedRoom.capacity}</span>
               </div>
 
-              {/* Direct Booking Form in Catalog */}
+              {/* Direct Booking Form in Catalog with 24h inputs and role limits */}
               <div className="card-subpanel" style={{ borderLeft: '4px solid #2563eb', background: '#f8fafc' }}>
-                <h5 style={{ color: '#1e40af', marginBottom: '8px' }}>📅 Reservar esta Sala Agora</h5>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h5 style={{ color: '#1e40af', margin: 0 }}>📅 Reservar esta Sala Agora</h5>
+                  <span className="text-xs text-muted">
+                    {user?.role === 'Professor' ? 'Regra: Máx 5 horas' : user?.role === 'Administrator' ? 'Regra: Máx 5 horas' : 'Regra Estudante: Máx 2 horas'}
+                  </span>
+                </div>
+
                 <form onSubmit={handleDirectBooking}>
                   <div className="form-row">
                     <label>
-                      Data da Reserva:
+                      Data:
                       <input
                         type="date"
                         value={bookingDate}
@@ -352,47 +395,49 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
                       />
                     </label>
                     <label>
-                      Horário Início:
+                      Início (24h):
                       <input
                         type="time"
                         value={bookingStartTime}
                         onChange={(e) => setBookingStartTime(e.target.value)}
                         required
-                        style={{ marginLeft: '6px' }}
+                        style={{ marginLeft: '6px', width: '100px' }}
+                      />
+                    </label>
+                    <label>
+                      Término (24h):
+                      <input
+                        type="time"
+                        value={bookingEndTime}
+                        onChange={(e) => setBookingEndTime(e.target.value)}
+                        required
+                        style={{ marginLeft: '6px', width: '100px' }}
                       />
                     </label>
                   </div>
 
-                  <div className="form-row">
-                    <label>
-                      Duração:
-                      <select
-                        value={bookingDuration}
-                        onChange={(e) => setBookingDuration(parseInt(e.target.value))}
-                        style={{ marginLeft: '6px' }}
-                      >
-                        <option value={1}>1 hora</option>
-                        <option value={2}>2 horas (padrão)</option>
-                        <option value={4}>4 horas (professores)</option>
-                      </select>
-                    </label>
-                    <label style={{ flex: 1 }}>
-                      Finalidade:
-                      <input
-                        type="text"
-                        value={bookingPurpose}
-                        onChange={(e) => setBookingPurpose(e.target.value)}
-                        placeholder="Ex: Grupo de Estudos N2"
-                        className="full-width"
-                        style={{ marginLeft: '6px' }}
-                      />
-                    </label>
+                  {/* Dynamic Duration Validation Status */}
+                  <div style={{ margin: '6px 0', fontSize: '0.82rem' }}>
+                    <span className={`badge ${durationValidation.valid ? 'badge-success' : 'badge-danger'}`}>
+                      {durationValidation.message}
+                    </span>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: '6px' }}>
+                    <label>Finalidade:</label>
+                    <input
+                      type="text"
+                      value={bookingPurpose}
+                      onChange={(e) => setBookingPurpose(e.target.value)}
+                      placeholder="Ex: Grupo de Estudos N2"
+                      className="full-width"
+                    />
                   </div>
 
                   <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                     <button
                       type="submit"
-                      disabled={bookingLoading}
+                      disabled={bookingLoading || !durationValidation.valid}
                       className="btn-primary btn-sm"
                     >
                       {bookingLoading ? 'Processando...' : 'Confirmar Reserva Imediata 📅'}
@@ -410,20 +455,20 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
                 </form>
               </div>
 
-              {/* Operating Hours */}
+              {/* Operating Hours in 24h format */}
               <div className="card-subpanel">
-                <strong className="text-xs">Horários Institucionais de Funcionamento:</strong>
+                <strong className="text-xs">Horários Institucionais de Funcionamento (24h):</strong>
                 {safeOperatingHours.length > 0 ? (
                   <ul style={{ paddingLeft: '20px', fontSize: '0.85rem', marginTop: '6px' }}>
                     {safeOperatingHours.map((h, i) => (
                       <li key={i}>
-                        Dia {h.dayOfWeek}: {h.opensAt} às {h.closesAt}
+                        Dia {h.dayOfWeek}: {h.opensAt.substring(0, 5)} às {h.closesAt.substring(0, 5)}
                       </li>
                     ))}
                   </ul>
                 ) : (
                   <p className="text-muted text-xs" style={{ marginTop: '4px' }}>
-                    Horário padrão de funcionamento no campus: <strong>07:00 às 22:30</strong>.
+                    Horário padrão de funcionamento no campus: <strong>07:00 às 22:30</strong> (24h).
                   </p>
                 )}
               </div>

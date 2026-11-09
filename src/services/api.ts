@@ -27,7 +27,7 @@ export async function apiRequest<T = any>(
 
   const method = options.method || 'GET';
   const logId = Math.random().toString(36).substring(2, 9);
-  const timestamp = new Date().toLocaleTimeString();
+  const timestamp = new Date().toLocaleTimeString('pt-BR', { hour12: false });
 
   let reqBodyParsed = null;
   if (options.body && typeof options.body === 'string') {

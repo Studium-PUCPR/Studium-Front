@@ -56,3 +56,8 @@ npm run dev
 - **2026-11-08 (Fix Catalog Routes for Room Detail & Maintenance):**
   - Updated room selection to query `GET /api/catalog/rooms/{id}` which contains operating hours, eliminating the 405 error from non-existent `GET /operating-hours`.
   - Updated maintenance scheduling route to `POST /api/catalog/rooms/{id}/maintenance-blocks`, resolving the 404 error.
+
+- **2026-11-08 (24h Time Format & Role-Based Duration Limits):**
+  - Removed all AM/PM time formatting across all components (`api.ts`, `BookingSection`, `CatalogSection`, `NotificationsSection`, `UsersSection`), standardizing strictly on 24h `HH:mm` format.
+  - Replaced fixed duration selector with 24h start-time and end-time inputs with dynamic duration calculation.
+  - Implemented client-side duration validation: restricts Students to max 2 hours (120 minutes) and Professors/Admins to max 5 hours (300 minutes), with live feedback badges and disabled submit button on invalid intervals.
