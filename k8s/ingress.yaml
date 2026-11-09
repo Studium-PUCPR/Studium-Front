@@ -38,6 +38,13 @@ spec:
             name: studium-notifications-service
             port:
               number: 80
+      - path: /api/audit
+        pathType: Prefix
+        backend:
+          service:
+            name: studium-audit-service
+            port:
+              number: 80
       - path: /
         pathType: Prefix
         backend:
