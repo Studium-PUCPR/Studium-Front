@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AuthUser } from './types';
+import { AuthUser, Room } from './types';
 import { getStoredUser } from './services/cognito';
 import { AuthBar } from './components/AuthBar';
 import { CatalogSection } from './components/CatalogSection';
@@ -11,6 +11,7 @@ import { ConsoleInspector } from './components/ConsoleInspector';
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [activeTab, setActiveTab] = useState<'catalog' | 'booking' | 'users' | 'notifications'>('catalog');
+  const [selectedRoomForBooking, setSelectedRoomForBooking] = useState<Room | null>(null);
 
   useEffect(() => {
     const user = getStoredUser();
@@ -21,6 +22,11 @@ export const App: React.FC = () => {
 
   const handleUserChange = (user: AuthUser | null) => {
     setCurrentUser(user);
+  };
+
+  const handleSelectRoomForBooking = (room: Room) => {
+    setSelectedRoomForBooking(room);
+    setActiveTab('booking');
   };
 
   return (
@@ -71,8 +77,18 @@ export const App: React.FC = () => {
 
       {/* Main Tab Content */}
       <main className="tab-content">
-        {activeTab === 'catalog' && <CatalogSection user={currentUser} />}
-        {activeTab === 'booking' && <BookingSection user={currentUser} />}
+        {activeTab === 'catalog' && (
+          <CatalogSection
+            user={currentUser}
+            onSelectRoomForBooking={handleSelectRoomForBooking}
+          />
+        )}
+        {activeTab === 'booking' && (
+          <BookingSection
+            user={currentUser}
+            selectedRoomFromCatalog={selectedRoomForBooking}
+          />
+        )}
         {activeTab === 'users' && <UsersSection user={currentUser} />}
         {activeTab === 'notifications' && <NotificationsSection user={currentUser} />}
       </main>

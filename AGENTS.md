@@ -44,3 +44,8 @@ npm run dev
 ## 6. Changelog
 - **2026-11-08:** Initialized React 18 + TypeScript + Vite project with NGINX reverse-proxy, Dockerfile, Kubernetes manifests, unified NGINX Ingress rules, and GitHub Actions CI/CD.
 - **2026-11-08:** Fixed `rooms.map` crash by safely unwrapping `PagedResponse` (`data.items` vs direct array) across Catalog, Booking, Users, and Notifications sections; added React `ErrorBoundary` and demo catalog data seeder.
+
+- **2026-11-08 (Direct Classroom Reservation & Date/Time Pickers):**
+  - Added instant reservation form directly inside `CatalogSection` so clicking any room allows immediate reservation without switching tabs.
+  - Added dynamic date, start-time, and duration pickers defaulting to valid campus operating hours (07:00 - 22:30), preventing `409 Outside operating hours` rejections.
+  - Added catalog room dropdown selector in `BookingSection` and hooked up tab switching with pre-selected rooms.
