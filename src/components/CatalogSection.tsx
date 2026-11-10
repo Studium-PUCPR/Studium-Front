@@ -1,4 +1,26 @@
+
 import React, { useState, useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faBuilding,
+  faRotate,
+  faPlus,
+  faDoorOpen,
+  faUsers,
+  faLayerGroup,
+  faCalendarDays,
+  faClock,
+  faArrowRight,
+  faWrench,
+  faCircleCheck,
+  faCircleExclamation,
+  faLocationDot,
+  faGraduationCap,
+  faChevronRight,
+  faInbox,
+  faSpinner,
+} from '@fortawesome/free-solid-svg-icons';
+
 import { Building, Room, AuthUser } from '../types';
 import { apiRequest } from '../services/api';
 
@@ -7,99 +29,185 @@ interface CatalogSectionProps {
   onSelectRoomForBooking?: (room: Room) => void;
 }
 
-export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRoomForBooking }) => {
+export const CatalogSection: React.FC<CatalogSectionProps> = ({
+  user,
+  onSelectRoomForBooking,
+}) => {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [operatingHours, setOperatingHours] = useState<any[]>([]);
-  const [maintenanceReason, setMaintenanceReason] = useState('Manutenção Técnica Preventiva');
+
+  const [maintenanceReason, setMaintenanceReason] = useState(
+    'Manutenção Técnica Preventiva'
+  );
   const [maintenanceHours, setMaintenanceHours] = useState(2);
+
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
-  const [message, setMessage] = useState<{ text: string; isError?: boolean } | null>(null);
 
-  // Direct room reservation state in Catalog
+  const [message, setMessage] = useState<{
+    text: string;
+    isError?: boolean;
+  } | null>(null);
+
   const getInitialDate = () => {
-    const d = new Date();
-    if (d.getHours() >= 20) {
-      d.setDate(d.getDate() + 1);
+    const date = new Date();
+
+    if (date.getHours() >= 20) {
+      date.setDate(date.getDate() + 1);
     }
-    return d.toISOString().split('T')[0];
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
   };
 
-  const [bookingDate, setBookingDate] = useState(getInitialDate());
+  const [bookingDate, setBookingDate] = useState(getInitialDate);
   const [bookingStartTime, setBookingStartTime] = useState('10:00');
   const [bookingEndTime, setBookingEndTime] = useState('12:00');
-  const [bookingPurpose, setBookingPurpose] = useState('Estudos e Trabalho Acadêmico');
+  const [bookingPurpose, setBookingPurpose] = useState(
+    'Estudos e Trabalho Acadêmico'
+  );
   const [bookingLoading, setBookingLoading] = useState(false);
 
-  const calculateDurationMinutes = (startStr: string, endStr: string) => {
+  const calculateDurationMinutes = (
+    startStr: string,
+    endStr: string
+  ) => {
     if (!startStr || !endStr) return 0;
+
     const [sh, sm] = startStr.split(':').map(Number);
     const [eh, em] = endStr.split(':').map(Number);
-    return (eh * 60 + em) - (sh * 60 + sm);
+
+    return eh * 60 + em - (sh * 60 + sm);
   };
 
-  const currentDurationMinutes = calculateDurationMinutes(bookingStartTime, bookingEndTime);
+  const currentDurationMinutes = calculateDurationMinutes(
+    bookingStartTime,
+    bookingEndTime
+  );
 
   const validateDuration = (minutes: number, role?: string) => {
     if (minutes <= 0) {
-      return { valid: false, message: 'Horário de término deve ser após o horário de início.' };
+      return {
+        valid: false,
+        message: 'O término deve ser após o início.',
+      };
     }
+
     if (minutes < 15) {
-      return { valid: false, message: 'Duração mínima permitida: 15 minutos.' };
+      return {
+        valid: false,
+        message: 'Duração mínima: 15 minutos.',
+      };
     }
-    const maxMinutes = role === 'Professor' || role === 'Administrator' ? 300 : 120;
-    const roleLimitDesc = role === 'Professor' ? '5 horas (Professor)' : role === 'Administrator' ? '5 horas (Admin)' : '2 horas (Estudante)';
+
+    const maxMinutes =
+      role === 'Professor' || role === 'Administrator' ? 300 : 120;
+
+    const roleLimitDesc =
+      role === 'Professor'
+        ? '5 horas (Professor)'
+        : role === 'Administrator'
+          ? '5 horas (Admin)'
+          : '2 horas (Estudante)';
 
     if (minutes > maxMinutes) {
       return {
         valid: false,
-        message: `Limite excedido: máximo ${roleLimitDesc}. Selecionado: ${Math.floor(minutes / 60)}h ${minutes % 60}m.`,
+        message: `Limite excedido. Máximo: ${roleLimitDesc}.`,
       };
     }
 
     return {
       valid: true,
-      message: `Duração calculada: ${Math.floor(minutes / 60)}h ${minutes % 60 ? `${minutes % 60}m` : '00m'} (Permitido: máx ${roleLimitDesc})`,
+      message: `Duração: ${Math.floor(minutes / 60)}h ${String(
+        minutes % 60
+      ).padStart(2, '0')}min · Limite: ${roleLimitDesc}`,
     };
   };
 
-  const durationValidation = validateDuration(currentDurationMinutes, user?.role);
+  const durationValidation = validateDuration(
+    currentDurationMinutes,
+    user?.role
+  );
+
+  const handleSelectRoom = async (room: Room) => {
+    setSelectedRoom(room);
+    setOperatingHours([]);
+
+    try {
+      const resp = await apiRequest<any>(
+        `/api/catalog/rooms/${room.id}`
+      );
+
+      if (resp.ok && resp.data) {
+        setOperatingHours(
+          Array.isArray(resp.data.operatingHours)
+            ? resp.data.operatingHours
+            : []
+        );
+      }
+    } catch {
+      setOperatingHours([]);
+    }
+  };
 
   const fetchCatalogData = async () => {
     setLoading(true);
-    try {
-      const bResp = await apiRequest<any>('/api/catalog/buildings');
-      if (bResp.ok && bResp.data) {
-        const bList = Array.isArray(bResp.data)
-          ? bResp.data
-          : Array.isArray(bResp.data.items)
-          ? bResp.data.items
-          : [];
-        setBuildings(bList);
-      } else {
-        setBuildings([]);
-      }
 
-      const rResp = await apiRequest<any>('/api/catalog/rooms');
-      if (rResp.ok && rResp.data) {
-        const rList = Array.isArray(rResp.data)
-          ? rResp.data
-          : Array.isArray(rResp.data.items)
-          ? rResp.data.items
+    try {
+      const bResp = await apiRequest<any>(
+        '/api/catalog/buildings'
+      );
+
+      const bList =
+        bResp.ok && bResp.data
+          ? Array.isArray(bResp.data)
+            ? bResp.data
+            : Array.isArray(bResp.data.items)
+              ? bResp.data.items
+              : []
           : [];
-        setRooms(rList);
-        if (rList.length > 0 && !selectedRoom) {
-          handleSelectRoom(rList[0]);
-        }
+
+      setBuildings(bList);
+
+      const rResp = await apiRequest<any>(
+        '/api/catalog/rooms'
+      );
+
+      const rList: Room[] =
+        rResp.ok && rResp.data
+          ? Array.isArray(rResp.data)
+            ? rResp.data
+            : Array.isArray(rResp.data.items)
+              ? rResp.data.items
+              : []
+          : [];
+
+      setRooms(rList);
+
+      if (rList.length > 0) {
+        const room =
+          rList.find((r) => r.id === selectedRoom?.id) ||
+          rList[0];
+
+        await handleSelectRoom(room);
       } else {
-        setRooms([]);
+        setSelectedRoom(null);
+        setOperatingHours([]);
       }
     } catch (e: any) {
-      setMessage({ text: `Erro ao carregar catálogo: ${e.message}`, isError: true });
+      setMessage({
+        text: `Erro ao carregar catálogo: ${e.message}`,
+        isError: true,
+      });
       setBuildings([]);
       setRooms([]);
+      setSelectedRoom(null);
     } finally {
       setLoading(false);
     }
@@ -107,35 +215,28 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
 
   useEffect(() => {
     fetchCatalogData();
+    // Carregamento inicial do catálogo
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleSelectRoom = async (room: Room) => {
-    setSelectedRoom(room);
-    try {
-      const resp = await apiRequest<any>(`/api/catalog/rooms/${room.id}`);
-      if (resp.ok && resp.data) {
-        const hList = Array.isArray(resp.data.operatingHours)
-          ? resp.data.operatingHours
-          : [];
-        setOperatingHours(hList);
-      } else {
-        setOperatingHours([]);
-      }
-    } catch {
-      setOperatingHours([]);
-    }
-  };
 
   const handleDirectBooking = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!selectedRoom) return;
+
     if (!user) {
-      setMessage({ text: '⚠️ Faça login com um usuário no topo antes de reservar.', isError: true });
+      setMessage({
+        text: 'Faça login antes de realizar uma reserva.',
+        isError: true,
+      });
       return;
     }
 
     if (!durationValidation.valid) {
-      setMessage({ text: `⚠️ ${durationValidation.message}`, isError: true });
+      setMessage({
+        text: durationValidation.message,
+        isError: true,
+      });
       return;
     }
 
@@ -143,10 +244,15 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
     setMessage(null);
 
     try {
-      const startsAtLocal = new Date(`${bookingDate}T${bookingStartTime}:00`);
-      const endsAtLocal = new Date(`${bookingDate}T${bookingEndTime}:00`);
+      const startsAtLocal = new Date(
+        `${bookingDate}T${bookingStartTime}:00`
+      );
 
-      const resp = await apiRequest('/api/bookings', {
+      const endsAtLocal = new Date(
+        `${bookingDate}T${bookingEndTime}:00`
+      );
+
+      const resp = await apiRequest<any>('/api/bookings', {
         method: 'POST',
         body: JSON.stringify({
           roomId: selectedRoom.id,
@@ -159,15 +265,26 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
 
       if (resp.ok) {
         setMessage({
-          text: `🎉 Reserva criada com sucesso para ${selectedRoom.name}! Horário: ${bookingStartTime} às ${bookingEndTime} (24h). Código Check-in: ${resp.data?.checkInCode || 'N/A'}.`,
+          text: `Reserva criada com sucesso para ${selectedRoom.name}! Horário: ${bookingStartTime} às ${bookingEndTime}. Código Check-in: ${resp.data?.checkInCode || 'N/A'}.`,
           isError: false,
         });
       } else {
-        const errMsg = resp.data?.detail || resp.data?.title || resp.data?.message || `Falha HTTP ${resp.status}`;
-        setMessage({ text: `❌ Não foi possível reservar: ${errMsg}`, isError: true });
+        const errMsg =
+          resp.data?.detail ||
+          resp.data?.title ||
+          resp.data?.message ||
+          `Falha HTTP ${resp.status}`;
+
+        setMessage({
+          text: `Não foi possível reservar: ${errMsg}`,
+          isError: true,
+        });
       }
     } catch (err: any) {
-      setMessage({ text: `❌ Erro de conexão: ${err.message}`, isError: true });
+      setMessage({
+        text: `Erro de conexão: ${err.message}`,
+        isError: true,
+      });
     } finally {
       setBookingLoading(false);
     }
@@ -175,36 +292,52 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
 
   const handleScheduleMaintenance = async () => {
     if (!selectedRoom) return;
+
     setLoading(true);
     setMessage(null);
 
     const now = new Date();
     const startsAtUtc = now.toISOString();
-    const endsAt = new Date(now.getTime() + maintenanceHours * 60 * 60 * 1000);
-    const endsAtUtc = endsAt.toISOString();
+
+    const endsAt = new Date(
+      now.getTime() + maintenanceHours * 60 * 60 * 1000
+    );
 
     try {
-      const resp = await apiRequest(`/api/catalog/rooms/${selectedRoom.id}/maintenance-blocks`, {
-        method: 'POST',
-        body: JSON.stringify({
-          startsAtUtc,
-          endsAtUtc,
-          reason: maintenanceReason,
-        }),
-      });
+      const resp = await apiRequest<any>(
+        `/api/catalog/rooms/${selectedRoom.id}/maintenance-blocks`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            startsAtUtc,
+            endsAtUtc: endsAt.toISOString(),
+            reason: maintenanceReason,
+          }),
+        }
+      );
 
       if (resp.ok) {
         setMessage({
-          text: `✅ Manutenção agendada com sucesso para ${selectedRoom.name}! Evento RoomMaintenanceScheduled publicado via RabbitMQ.`,
+          text: `Manutenção agendada para ${selectedRoom.name}! Evento RoomMaintenanceScheduled publicado via RabbitMQ.`,
           isError: false,
         });
-        fetchCatalogData();
+
+        await fetchCatalogData();
       } else {
-        const errMsg = resp.data?.detail || resp.data?.message || 'Erro ao agendar';
-        setMessage({ text: `❌ Falha: ${errMsg}`, isError: true });
+        setMessage({
+          text: `Falha: ${
+            resp.data?.detail ||
+            resp.data?.message ||
+            'Erro ao agendar'
+          }`,
+          isError: true,
+        });
       }
     } catch (e: any) {
-      setMessage({ text: `❌ Erro: ${e.message}`, isError: true });
+      setMessage({
+        text: `Erro: ${e.message}`,
+        isError: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -213,25 +346,30 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
   const handleSeedDemoData = async () => {
     setSeeding(true);
     setMessage(null);
+
     try {
-      // 1. Create Building
-      const bRes = await apiRequest('/api/catalog/buildings', {
-        method: 'POST',
-        body: JSON.stringify({
-          code: 'BLOCO-02',
-          name: 'Bloco 2 - Politécnico PUCPR',
-          address: 'Rua Imaculada Conceição, 1155, Prado Velho, Curitiba - PR',
-          description: 'Prédio da Escola Politécnica e Laboratórios de Computação',
-        }),
-      });
+      const bRes = await apiRequest<any>(
+        '/api/catalog/buildings',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            code: 'BLOCO-02',
+            name: 'Bloco 2 - Politécnico PUCPR',
+            address:
+              'Rua Imaculada Conceição, 1155, Prado Velho, Curitiba - PR',
+            description:
+              'Prédio da Escola Politécnica e Laboratórios de Computação',
+          }),
+        }
+      );
 
       let bId = bRes.data?.id;
+
       if (!bId && buildings.length > 0) {
         bId = buildings[0].id;
       }
 
       if (bId) {
-        // 2. Create Rooms
         await apiRequest('/api/catalog/rooms', {
           method: 'POST',
           body: JSON.stringify({
@@ -260,262 +398,508 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ user, onSelectRo
           }),
         });
 
-        setMessage({ text: '🎉 Prédio e salas de demonstração criados com sucesso!', isError: false });
+        setMessage({
+          text: 'Prédio e salas de demonstração criados com sucesso!',
+          isError: false,
+        });
+
         await fetchCatalogData();
       } else {
-        setMessage({ text: `Erro ao criar prédio: ${bRes.data?.message || 'Resposta inesperada'}`, isError: true });
+        setMessage({
+          text: `Erro ao criar prédio: ${
+            bRes.data?.message || 'Resposta inesperada'
+          }`,
+          isError: true,
+        });
       }
     } catch (err: any) {
-      setMessage({ text: `Erro ao gerar dados: ${err.message}`, isError: true });
+      setMessage({
+        text: `Erro ao gerar dados: ${err.message}`,
+        isError: true,
+      });
     } finally {
       setSeeding(false);
     }
   };
 
   const safeRooms = Array.isArray(rooms) ? rooms : [];
-  const safeOperatingHours = Array.isArray(operatingHours) ? operatingHours : [];
+  const safeOperatingHours = Array.isArray(operatingHours)
+    ? operatingHours
+    : [];
+
+  const canManageMaintenance =
+    user?.role === 'Administrator' ||
+    user?.role === 'Professor';
 
   return (
-    <div className="section-card">
-      <div className="card-header">
-        <div>
-          <h3>🏛️ Catálogo de Espaços e Instalações (Studium-Catalog)</h3>
-          <p className="hint">Prédios, salas, capacidade, horários de funcionamento e bloqueios de manutenção.</p>
+    <section className="section-card catalog-section">
+
+      {/* CABEÇALHO */}
+      <div className="card-header catalog-header">
+        <div className="catalog-heading">
+          <div className="catalog-heading-icon">
+            <FontAwesomeIcon icon={faBuilding} />
+          </div>
+
+          <div>
+            <span className="catalog-eyebrow">
+              STUDIUM CATALOG SERVICE
+            </span>
+            <h2>Catálogo de Espaços</h2>
+            <p className="hint">
+              Gerencie salas, disponibilidade e reservas
+              da instituição.
+            </p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {user?.role === 'Administrator' && safeRooms.length === 0 && (
-            <button onClick={handleSeedDemoData} disabled={seeding} className="btn-primary btn-sm">
-              {seeding ? 'Cadastrando...' : '✨ Cadastrar Salas de Demonstração'}
-            </button>
-          )}
-          <button onClick={fetchCatalogData} disabled={loading} className="btn-secondary btn-sm">
-            {loading ? 'Carregando...' : '🔄 Atualizar Catálogo'}
+
+        <div className="catalog-header-actions">
+          {user?.role === 'Administrator' &&
+            safeRooms.length === 0 && (
+              <button
+                type="button"
+                onClick={handleSeedDemoData}
+                disabled={seeding}
+                className="btn-primary btn-sm"
+              >
+                <FontAwesomeIcon
+                  icon={seeding ? faSpinner : faPlus}
+                  spin={seeding}
+                />
+                {seeding
+                  ? 'Cadastrando...'
+                  : 'Criar salas demo'}
+              </button>
+            )}
+
+          <button
+            type="button"
+            onClick={fetchCatalogData}
+            disabled={loading}
+            className="btn-secondary btn-sm"
+          >
+            <FontAwesomeIcon
+              icon={loading ? faSpinner : faRotate}
+              spin={loading}
+            />
+            Atualizar
           </button>
         </div>
       </div>
 
+      {/* FEEDBACK */}
       {message && (
-        <div className={`alert ${message.isError ? 'alert-error' : 'alert-success'}`}>
-          {message.text}
+        <div
+          className={`alert ${
+            message.isError ? 'alert-error' : 'alert-success'
+          } catalog-alert`}
+          role="alert"
+        >
+          <FontAwesomeIcon
+            icon={
+              message.isError
+                ? faCircleExclamation
+                : faCircleCheck
+            }
+          />
+          <span>{message.text}</span>
         </div>
       )}
 
-      <div className="grid-cards" style={{ gridTemplateColumns: '1fr 1.2fr' }}>
-        {/* Buildings & Rooms List */}
-        <div className="sub-card">
-          <h4>Salas e Espaços Cadastrados ({safeRooms.length})</h4>
-          {safeRooms.length === 0 ? (
-            <div style={{ padding: '24px 12px', textAlign: 'center', color: '#64748b' }}>
-              <p>📭 Nenhuma sala cadastrada no momento.</p>
-              {user?.role === 'Administrator' ? (
-                <p className="text-xs text-muted" style={{ marginTop: '8px' }}>
-                  Como <strong>Administrador</strong>, você pode clicar no botão <strong>"✨ Cadastrar Salas de Demonstração"</strong> acima para criar prédios e salas de teste.
-                </p>
-              ) : (
-                <p className="text-xs text-muted" style={{ marginTop: '8px' }}>
-                  Faça login como Administrador acima para cadastrar prédios e salas de aula.
-                </p>
+      {/* INDICADORES */}
+      <div className="catalog-stats">
+        <div className="catalog-stat-card">
+          <div className="catalog-stat-icon">
+            <FontAwesomeIcon icon={faDoorOpen} />
+          </div>
+          <div>
+            <span>Salas cadastradas</span>
+            <strong>{safeRooms.length}</strong>
+          </div>
+        </div>
+
+        <div className="catalog-stat-card">
+          <div className="catalog-stat-icon">
+            <FontAwesomeIcon icon={faBuilding} />
+          </div>
+          <div>
+            <span>Prédios</span>
+            <strong>{buildings.length}</strong>
+          </div>
+        </div>
+
+        <div className="catalog-stat-card">
+          <div className="catalog-stat-icon">
+            <FontAwesomeIcon icon={faUsers} />
+          </div>
+          <div>
+            <span>Capacidade total</span>
+            <strong>
+              {safeRooms.reduce(
+                (total, room) => total + (Number(room.capacity) || 0),
+                0
               )}
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      {/* CONTEÚDO */}
+      <div className="catalog-layout">
+
+        {/* LISTA DE SALAS */}
+        <div className="catalog-list-panel">
+          <div className="catalog-panel-heading">
+            <div>
+              <h3>Salas disponíveis no catálogo</h3>
+              <p>Selecione um espaço para visualizar detalhes.</p>
+            </div>
+            <span className="catalog-count">
+              {safeRooms.length}
+            </span>
+          </div>
+
+          {safeRooms.length === 0 ? (
+            <div className="catalog-empty">
+              <FontAwesomeIcon icon={faInbox} />
+              <h4>Nenhuma sala cadastrada</h4>
+              <p>
+                {user?.role === 'Administrator'
+                  ? 'Utilize o botão Criar salas demo para começar.'
+                  : 'Entre como administrador para cadastrar salas.'}
+              </p>
             </div>
           ) : (
-            <div className="rooms-scroll-list" style={{ maxHeight: '420px', overflowY: 'auto' }}>
-              {safeRooms.map((r) => (
-                <div
-                  key={r.id}
-                  onClick={() => handleSelectRoom(r)}
-                  style={{
-                    padding: '10px 12px',
-                    borderBottom: '1px solid #e2e8f0',
-                    cursor: 'pointer',
-                    background: selectedRoom?.id === r.id ? '#e0f2fe' : 'transparent',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderLeft: selectedRoom?.id === r.id ? '4px solid #2563eb' : '4px solid transparent',
-                  }}
-                >
-                  <div>
-                    <strong>{r.name}</strong> <span className="font-mono text-xs">({r.code})</span>
-                    <div className="text-muted text-xs">
-                      Capacidade: {r.capacity} pessoas | Andar: {r.floor} | Tipo: {r.type}
+            <div className="rooms-scroll-list">
+              {safeRooms.map((room) => {
+                const isSelected =
+                  selectedRoom?.id === room.id;
+
+                return (
+                  <div
+                    key={room.id}
+                    className={`catalog-room-item ${
+                      isSelected ? 'selected' : ''
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="catalog-room-select"
+                      onClick={() => handleSelectRoom(room)}
+                      aria-pressed={isSelected}
+                    >
+                      <div className="catalog-room-top">
+                        <div className="catalog-room-icon">
+                          <FontAwesomeIcon icon={faDoorOpen} />
+                        </div>
+
+                        <div className="catalog-room-info">
+                          <strong>{room.name}</strong>
+                          <span>{room.code}</span>
+                        </div>
+                      </div>
+
+                      <div className="catalog-room-meta">
+                        <span>
+                          <FontAwesomeIcon icon={faUsers} />
+                          {room.capacity} pessoas
+                        </span>
+                        <span>
+                          <FontAwesomeIcon icon={faLayerGroup} />
+                          Andar {room.floor}
+                        </span>
+                      </div>
+                    </button>
+
+                    <div className="catalog-room-footer">
+                      <span
+                        className={`badge ${
+                          room.isActive
+                            ? 'badge-success'
+                            : 'badge-danger'
+                        }`}
+                      >
+                        {room.isActive ? 'Ativa' : 'Inativa'}
+                      </span>
+
+                      <button
+                        type="button"
+                        className="catalog-room-action"
+                        onClick={() => handleSelectRoom(room)}
+                      >
+                        Selecionar
+                        <FontAwesomeIcon icon={faChevronRight} />
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span className={`badge ${r.isActive ? 'badge-success' : 'badge-danger'}`}>
-                      {r.isActive ? 'Ativo' : 'Inativo'}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectRoom(r);
-                      }}
-                      className="btn-primary btn-xs"
-                    >
-                      Reservar 📅
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Selected Room Details & Instant Booking Form */}
-        <div className="sub-card">
-          <h4>Detalhes & Reserva da Sala</h4>
+        {/* DETALHES */}
+        <div className="catalog-details-panel">
+          <div className="catalog-panel-heading">
+            <div>
+              <h3>Detalhes & Reserva</h3>
+              <p>Informações e agendamento do espaço.</p>
+            </div>
+          </div>
+
           {selectedRoom ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <h5>{selectedRoom.name} ({selectedRoom.code})</h5>
-                  <p className="text-xs font-mono text-muted">ID: {selectedRoom.id}</p>
+            <div className="catalog-details-content">
+
+              <div className="catalog-selected-room">
+                <div className="catalog-selected-icon">
+                  <FontAwesomeIcon icon={faDoorOpen} />
                 </div>
-                <span className="badge badge-info">Capacidade: {selectedRoom.capacity}</span>
+
+                <div className="catalog-selected-info">
+                  <span className="catalog-eyebrow">
+                    ESPAÇO SELECIONADO
+                  </span>
+                  <h3>{selectedRoom.name}</h3>
+                  <p>{selectedRoom.code}</p>
+                </div>
+
+                <span className="badge badge-info">
+                  <FontAwesomeIcon icon={faUsers} />
+                  {selectedRoom.capacity} vagas
+                </span>
               </div>
 
-              {/* Direct Booking Form in Catalog with 24h inputs and role limits */}
-              <div className="card-subpanel" style={{ borderLeft: '4px solid #2563eb', background: '#f8fafc' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <h5 style={{ color: '#1e40af', margin: 0 }}>📅 Reservar esta Sala Agora</h5>
-                  <span className="text-xs text-muted">
-                    {user?.role === 'Professor' ? 'Regra: Máx 5 horas' : user?.role === 'Administrator' ? 'Regra: Máx 5 horas' : 'Regra Estudante: Máx 2 horas'}
+              <div className="catalog-room-properties">
+                <span>
+                  <FontAwesomeIcon icon={faLayerGroup} />
+                  Andar {selectedRoom.floor}
+                </span>
+                <span>
+                  <FontAwesomeIcon icon={faLocationDot} />
+                  {selectedRoom.type}
+                </span>
+              </div>
+
+              {/* FORMULÁRIO */}
+              <div className="catalog-booking-panel">
+                <div className="catalog-booking-heading">
+                  <div>
+                    <h4>
+                      <FontAwesomeIcon icon={faCalendarDays} />
+                      Reservar esta sala
+                    </h4>
+                    <p>
+                      Escolha uma data e o período desejado.
+                    </p>
+                  </div>
+
+                  <span className="catalog-booking-limit">
+                    <FontAwesomeIcon icon={faClock} />
+                    Máx. {canManageMaintenance ? '5h' : '2h'}
                   </span>
                 </div>
 
                 <form onSubmit={handleDirectBooking}>
-                  <div className="form-row">
+                  <div className="catalog-booking-fields">
                     <label>
-                      Data:
+                      Data da reserva
                       <input
                         type="date"
                         value={bookingDate}
-                        onChange={(e) => setBookingDate(e.target.value)}
+                        onChange={(e) =>
+                          setBookingDate(e.target.value)
+                        }
                         required
-                        style={{ marginLeft: '6px' }}
                       />
                     </label>
+
                     <label>
-                      Início (24h):
+                      Horário de início
                       <input
                         type="time"
                         value={bookingStartTime}
-                        onChange={(e) => setBookingStartTime(e.target.value)}
+                        onChange={(e) =>
+                          setBookingStartTime(e.target.value)
+                        }
                         required
-                        style={{ marginLeft: '6px', width: '100px' }}
                       />
                     </label>
+
                     <label>
-                      Término (24h):
+                      Horário de término
                       <input
                         type="time"
                         value={bookingEndTime}
-                        onChange={(e) => setBookingEndTime(e.target.value)}
+                        onChange={(e) =>
+                          setBookingEndTime(e.target.value)
+                        }
                         required
-                        style={{ marginLeft: '6px', width: '100px' }}
                       />
                     </label>
                   </div>
 
-                  {/* Dynamic Duration Validation Status */}
-                  <div style={{ margin: '6px 0', fontSize: '0.82rem' }}>
-                    <span className={`badge ${durationValidation.valid ? 'badge-success' : 'badge-danger'}`}>
-                      {durationValidation.message}
-                    </span>
+                  <div
+                    className={`catalog-duration ${
+                      durationValidation.valid
+                        ? 'valid'
+                        : 'invalid'
+                    }`}
+                  >
+                    <FontAwesomeIcon
+                      icon={
+                        durationValidation.valid
+                          ? faCircleCheck
+                          : faCircleExclamation
+                      }
+                    />
+                    {durationValidation.message}
                   </div>
 
-                  <div className="form-group" style={{ marginTop: '6px' }}>
-                    <label>Finalidade:</label>
+                  <div className="form-group">
+                    <label htmlFor="catalog-purpose">
+                      Finalidade da reserva
+                    </label>
                     <input
+                      id="catalog-purpose"
                       type="text"
                       value={bookingPurpose}
-                      onChange={(e) => setBookingPurpose(e.target.value)}
-                      placeholder="Ex: Grupo de Estudos N2"
+                      onChange={(e) =>
+                        setBookingPurpose(e.target.value)
+                      }
+                      placeholder="Ex: Grupo de estudos"
                       className="full-width"
                     />
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                  <div className="catalog-booking-actions">
                     <button
                       type="submit"
-                      disabled={bookingLoading || !durationValidation.valid}
-                      className="btn-primary btn-sm"
+                      disabled={
+                        bookingLoading ||
+                        !durationValidation.valid
+                      }
+                      className="btn-primary"
                     >
-                      {bookingLoading ? 'Processando...' : 'Confirmar Reserva Imediata 📅'}
+                      <FontAwesomeIcon
+                        icon={
+                          bookingLoading
+                            ? faSpinner
+                            : faCalendarDays
+                        }
+                        spin={bookingLoading}
+                      />
+                      {bookingLoading
+                        ? 'Processando...'
+                        : 'Confirmar reserva'}
                     </button>
+
                     {onSelectRoomForBooking && (
                       <button
                         type="button"
-                        onClick={() => onSelectRoomForBooking(selectedRoom)}
-                        className="btn-secondary btn-sm"
+                        onClick={() =>
+                          onSelectRoomForBooking(selectedRoom)
+                        }
+                        className="btn-secondary"
                       >
-                        Abrir Linha do Tempo Completa 🕒
+                        Ver linha do tempo
+                        <FontAwesomeIcon icon={faArrowRight} />
                       </button>
                     )}
                   </div>
                 </form>
               </div>
 
-              {/* Operating Hours in 24h format */}
-              <div className="card-subpanel">
-                <strong className="text-xs">Horários Institucionais de Funcionamento (24h):</strong>
+              {/* HORÁRIOS */}
+              <div className="catalog-info-panel">
+                <h4>
+                  <FontAwesomeIcon icon={faClock} />
+                  Horários institucionais
+                </h4>
+
                 {safeOperatingHours.length > 0 ? (
-                  <ul style={{ paddingLeft: '20px', fontSize: '0.85rem', marginTop: '6px' }}>
-                    {safeOperatingHours.map((h, i) => (
-                      <li key={i}>
-                        Dia {h.dayOfWeek}: {h.opensAt.substring(0, 5)} às {h.closesAt.substring(0, 5)}
+                  <ul>
+                    {safeOperatingHours.map((hour, index) => (
+                      <li key={index}>
+                        Dia {hour.dayOfWeek}: {' '}
+                        {hour.opensAt.substring(0, 5)}
+                        {' às '}
+                        {hour.closesAt.substring(0, 5)}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-muted text-xs" style={{ marginTop: '4px' }}>
-                    Horário padrão de funcionamento no campus: <strong>07:00 às 22:30</strong> (24h).
+                  <p>
+                    Funcionamento padrão do campus:
+                    <strong> 07:00 às 22:30</strong>
                   </p>
                 )}
               </div>
 
-              {/* Maintenance scheduling (Professors or Admins) */}
-              {(user?.role === 'Administrator' || user?.role === 'Professor') && (
-                <div className="card-subpanel" style={{ borderLeft: '3px solid #dc2626' }}>
-                  <strong className="text-xs">🔧 Agendar Bloqueio Temporário de Manutenção (UC008)</strong>
-                  <div className="form-row" style={{ marginTop: '8px' }}>
+              {/* MANUTENÇÃO */}
+              {canManageMaintenance && (
+                <div className="catalog-maintenance-panel">
+                  <h4>
+                    <FontAwesomeIcon icon={faWrench} />
+                    Bloqueio de manutenção
+                  </h4>
+
+                  <p>
+                    Agende uma indisponibilidade temporária
+                    para este espaço.
+                  </p>
+
+                  <div className="catalog-maintenance-fields">
                     <label>
-                      Duração (horas):
+                      Duração (horas)
                       <input
                         type="number"
                         min="1"
                         max="24"
                         value={maintenanceHours}
-                        onChange={(e) => setMaintenanceHours(parseInt(e.target.value) || 1)}
-                        style={{ width: '80px', marginLeft: '6px' }}
+                        onChange={(e) =>
+                          setMaintenanceHours(
+                            parseInt(e.target.value) || 1
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Justificativa
+                      <input
+                        type="text"
+                        value={maintenanceReason}
+                        onChange={(e) =>
+                          setMaintenanceReason(e.target.value)
+                        }
                       />
                     </label>
                   </div>
-                  <div className="form-group">
-                    <label>Justificativa:</label>
-                    <input
-                      type="text"
-                      value={maintenanceReason}
-                      onChange={(e) => setMaintenanceReason(e.target.value)}
-                      className="full-width"
-                    />
-                  </div>
+
                   <button
+                    type="button"
                     onClick={handleScheduleMaintenance}
                     disabled={loading}
                     className="btn-danger btn-sm"
                   >
-                    Agendar Manutenção Agora
+                    <FontAwesomeIcon icon={faWrench} />
+                    Agendar manutenção
                   </button>
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-muted text-sm" style={{ padding: '24px 0', textAlign: 'center' }}>
-              Clique em uma sala à esquerda para reservar ou inspecionar detalhes.
-            </p>
+            <div className="catalog-empty">
+              <FontAwesomeIcon icon={faDoorOpen} />
+              <h4>Nenhuma sala selecionada</h4>
+              <p>
+                Escolha uma sala no catálogo para visualizar
+                suas informações e realizar uma reserva.
+              </p>
+            </div>
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 };

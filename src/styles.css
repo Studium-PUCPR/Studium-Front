@@ -1860,3 +1860,630 @@ button { border-radius: 9px; }
     flex-basis: auto;
   }
 }
+
+
+/* =========================================
+   STUDIUM — CATALOG DARK PREMIUM
+   ========================================= */
+
+.catalog-section {
+  background: #12233b;
+  border: 1px solid #2b4260;
+}
+
+.catalog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.catalog-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.catalog-heading-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  border-radius: 13px;
+  background: #203e63;
+  color: #93c5fd;
+  font-size: 1.2rem;
+}
+
+.catalog-eyebrow {
+  display: block;
+  color: #60a5fa;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  margin-bottom: 5px;
+}
+
+.catalog-heading h2 {
+  color: #f8fafc;
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.catalog-heading .hint {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.catalog-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.catalog-header-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+/* Indicadores */
+
+.catalog-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 24px 0;
+}
+
+.catalog-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  background: #192d48;
+  border: 1px solid #304767;
+  border-radius: 12px;
+}
+
+.catalog-stat-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  background: #203e63;
+  color: #93c5fd;
+  border-radius: 10px;
+}
+
+.catalog-stat-card > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.catalog-stat-card span {
+  color: #a6b9d3;
+  font-size: 0.75rem;
+}
+
+.catalog-stat-card strong {
+  color: #f8fafc;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+/* Layout principal */
+
+.catalog-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.catalog-list-panel,
+.catalog-details-panel {
+  min-width: 0;
+  padding: 22px;
+  background: #142640;
+  border: 1px solid #2b4260;
+  border-radius: 14px;
+}
+
+.catalog-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.catalog-panel-heading h3 {
+  color: #f1f5f9;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.catalog-panel-heading p {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  margin-top: 5px;
+}
+
+.catalog-count {
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: #203e63;
+  color: #93c5fd;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* Lista de salas */
+
+.rooms-scroll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 540px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.catalog-room-item {
+  padding: 16px;
+  background: #192d48;
+  border: 1px solid #304767;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.catalog-room-item:hover {
+  background: #203856;
+  border-color: #4777aa;
+}
+
+.catalog-room-item.selected {
+  background: #203e63;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 1px rgba(96,165,250,0.1);
+}
+
+.catalog-room-select {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+
+.catalog-room-select:hover {
+  background: transparent;
+}
+
+.catalog-room-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.catalog-room-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: #25466c;
+  color: #93c5fd;
+}
+
+.catalog-room-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.catalog-room-info strong {
+  color: #f8fafc;
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+
+.catalog-room-info > span {
+  color: #93c5fd;
+  font-size: 0.72rem;
+}
+
+.catalog-room-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+  color: #a6b9d3;
+  font-size: 0.74rem;
+}
+
+.catalog-room-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.catalog-room-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid #36506f;
+}
+
+.catalog-room-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  background: transparent;
+  border: none;
+  color: #93c5fd;
+  font-size: 0.75rem;
+}
+
+.catalog-room-action:hover {
+  color: #ffffff;
+}
+
+/* Sala selecionada */
+
+.catalog-selected-room {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  background: #192d48;
+  border: 1px solid #304767;
+  border-radius: 12px;
+}
+
+.catalog-selected-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: #203e63;
+  color: #93c5fd;
+}
+
+.catalog-selected-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.catalog-selected-info h3 {
+  color: #f8fafc;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.catalog-selected-info p {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+
+.catalog-selected-room .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.catalog-room-properties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 15px 0;
+  color: #a6b9d3;
+  font-size: 0.77rem;
+}
+
+.catalog-room-properties span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Reserva */
+
+.catalog-booking-panel {
+  padding: 22px;
+  background: #192d48;
+  border: 1px solid #36506f;
+  border-radius: 13px;
+}
+
+.catalog-booking-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.catalog-booking-heading h4 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #f1f5f9;
+  font-size: 0.95rem;
+}
+
+.catalog-booking-heading h4 svg {
+  color: #93c5fd;
+}
+
+.catalog-booking-heading p {
+  margin-top: 6px;
+  color: #94a3b8;
+  font-size: 0.76rem;
+}
+
+.catalog-booking-limit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  background: #203e63;
+  border-radius: 8px;
+  color: #93c5fd;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.catalog-booking-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.catalog-booking-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.catalog-booking-fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  margin: 0;
+  background: #0c1b30;
+  color: #f8fafc;
+  border: 1px solid #36506f;
+  border-radius: 9px;
+  font-size: 0.8rem;
+}
+
+.catalog-duration {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  margin-bottom: 18px;
+  border-radius: 9px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.catalog-duration.valid {
+  background: #123d38;
+  border: 1px solid #276e5d;
+  color: #a7f3d0;
+}
+
+.catalog-duration.invalid {
+  background: #4a2433;
+  border: 1px solid #9f425b;
+  color: #fecdd3;
+}
+
+.catalog-booking-panel .form-group label {
+  color: #cbd5e1;
+}
+
+.catalog-booking-panel .form-group input {
+  background: #0c1b30;
+  color: #f8fafc;
+  border-color: #36506f;
+}
+
+.catalog-booking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.catalog-booking-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 43px;
+}
+
+/* Informações institucionais */
+
+.catalog-info-panel {
+  margin-top: 16px;
+  padding: 20px;
+  background: #192d48;
+  border: 1px solid #304767;
+  border-radius: 12px;
+}
+
+.catalog-info-panel h4 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  color: #f1f5f9;
+  font-size: 0.84rem;
+}
+
+.catalog-info-panel h4 svg {
+  color: #93c5fd;
+}
+
+.catalog-info-panel p,
+.catalog-info-panel li {
+  color: #a6b9d3;
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+.catalog-info-panel ul {
+  padding-left: 20px;
+}
+
+.catalog-info-panel strong {
+  color: #f1f5f9;
+}
+
+/* Manutenção */
+
+.catalog-maintenance-panel {
+  margin-top: 16px;
+  padding: 20px;
+  background: #241f35;
+  border: 1px solid #69405c;
+  border-radius: 12px;
+}
+
+.catalog-maintenance-panel h4 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fecdd3;
+  font-size: 0.88rem;
+}
+
+.catalog-maintenance-panel p {
+  margin: 8px 0 18px;
+  color: #cbd5e1;
+  font-size: 0.76rem;
+}
+
+.catalog-maintenance-fields {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.catalog-maintenance-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 0.76rem;
+}
+
+.catalog-maintenance-fields input {
+  width: 100%;
+  min-width: 0;
+  background: #0c1b30;
+  border: 1px solid #69405c;
+  color: #f8fafc;
+}
+
+/* Estado vazio */
+
+.catalog-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  padding: 24px;
+  text-align: center;
+}
+
+.catalog-empty > svg {
+  color: #60a5fa;
+  font-size: 2rem;
+  margin-bottom: 16px;
+}
+
+.catalog-empty h4 {
+  color: #f1f5f9;
+  font-size: 0.95rem;
+}
+
+.catalog-empty p {
+  max-width: 320px;
+  margin-top: 8px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.catalog-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* Responsividade */
+
+@media (max-width: 1100px) {
+  .catalog-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .catalog-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .catalog-list-panel,
+  .catalog-details-panel {
+    padding: 16px;
+  }
+
+  .catalog-booking-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-maintenance-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-selected-room {
+    flex-wrap: wrap;
+  }
+}
