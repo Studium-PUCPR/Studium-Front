@@ -1,5 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { Booking, Room, RoomTimelineSlot, WaitlistEntry, AuthUser } from '../types';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faCalendarDays,
+  faCalendarPlus,
+  faClock,
+  faRotate,
+  faChartColumn,
+  faDoorOpen,
+  faUsers,
+  faLayerGroup,
+  faCircleCheck,
+  faCircleExclamation,
+  faCircleInfo,
+  faSpinner,
+  faListOl,
+  faRightToBracket,
+  faRightFromBracket,
+  faTrashCan,
+  faTicket,
+  faShieldHalved,
+  faArrowRight,
+  faInbox,
+  faChevronDown,
+  faChartPie,
+  faHourglassHalf,
+  faClipboardCheck,
+  faBuilding,
+  faMagnifyingGlass,
+} from '@fortawesome/free-solid-svg-icons';
+
+import {
+  Booking,
+  Room,
+  RoomTimelineSlot,
+  WaitlistEntry,
+  AuthUser,
+} from '../types';
 import { apiRequest } from '../services/api';
 
 interface BookingSectionProps {
@@ -7,203 +44,394 @@ interface BookingSectionProps {
   selectedRoomFromCatalog?: Room | null;
 }
 
-export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRoomFromCatalog }) => {
+type Feedback = {
+  text: string;
+  isError?: boolean;
+};
+
+const getInitialDate = (): string => {
+  const date = new Date();
+
+  if (date.getHours() >= 20) {
+    date.setDate(date.getDate() + 1);
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
+const formatTime24h = (isoString: string): string => {
+  const date = new Date(isoString);
+
+  if (Number.isNaN(date.getTime())) return isoString;
+
+  return date.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+};
+
+const formatDateTime24h = (isoString: string): string => {
+  const date = new Date(isoString);
+
+  if (Number.isNaN(date.getTime())) return isoString;
+
+  return `${date.toLocaleDateString('pt-BR')} às ${formatTime24h(
+    isoString
+  )}`;
+};
+
+const calculateDurationMinutes = (
+  start: string,
+  end: string
+): number => {
+  if (!start || !end) return 0;
+
+  const [startHour, startMinute] = start.split(':').map(Number);
+  const [endHour, endMinute] = end.split(':').map(Number);
+
+  return endHour * 60 + endMinute - (startHour * 60 + startMinute);
+};
+
+const normalizeStatus = (status?: string): string =>
+  (status || 'Unknown').toLowerCase();
+
+const getStatusLabel = (status?: string): string => {
+  const labels: Record<string, string> = {
+    confirmed: 'Confirmada',
+    checkedin: 'Check-in realizado',
+    checkedout: 'Finalizada',
+    cancelled: 'Cancelada',
+    canceled: 'Cancelada',
+    pending: 'Pendente',
+    available: 'Disponível',
+    maintenance: 'Manutenção',
+    occupied: 'Ocupada',
+    unknown: 'Desconhecido',
+  };
+
+  return labels[normalizeStatus(status)] || status || 'Desconhecido';
+};
+
+const getStatusClass = (status?: string): string => {
+  switch (normalizeStatus(status)) {
+    case 'confirmed':
+    case 'available':
+      return 'success';
+
+    case 'checkedin':
+      return 'info';
+
+    case 'checkedout':
+      return 'neutral';
+
+    case 'cancelled':
+    case 'canceled':
+      return 'danger';
+
+    case 'maintenance':
+    case 'occupied':
+    case 'pending':
+      return 'warning';
+
+    default:
+      return 'neutral';
+  }
+};
+
+export const BookingSection: React.FC<BookingSectionProps> = ({
+  user,
+  selectedRoomFromCatalog,
+}) => {
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
-  const [roomId, setRoomId] = useState<string>('');
+  const [roomId, setRoomId] = useState('');
   const [roomStatus, setRoomStatus] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<RoomTimelineSlot[]>([]);
+
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
-  const [occupancyReport, setOccupancyReport] = useState<any | null>(null);
+  const [occupancyReport, setOccupancyReport] = useState<any | null>(
+    null
+  );
 
-  // Date and Time pickers (24h)
-  const getInitialDate = () => {
-    const d = new Date();
-    if (d.getHours() >= 20) {
-      d.setDate(d.getDate() + 1);
-    }
-    return d.toISOString().split('T')[0];
-  };
-
-  const [date, setDate] = useState(getInitialDate());
+  const [date, setDate] = useState(getInitialDate);
   const [startTime, setStartTime] = useState('10:00');
   const [endTime, setEndTime] = useState('12:00');
-  const [purpose, setPurpose] = useState('Sessão de Estudos em Grupo');
+  const [purpose, setPurpose] = useState(
+    'Sessão de Estudos em Grupo'
+  );
+
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
 
-  const calculateDurationMinutes = (startStr: string, endStr: string) => {
-    if (!startStr || !endStr) return 0;
-    const [sh, sm] = startStr.split(':').map(Number);
-    const [eh, em] = endStr.split(':').map(Number);
-    return (eh * 60 + em) - (sh * 60 + sm);
-  };
+  const [message, setMessage] = useState<Feedback | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
-  const currentDurationMinutes = calculateDurationMinutes(startTime, endTime);
+  const currentDurationMinutes = calculateDurationMinutes(
+    startTime,
+    endTime
+  );
 
-  const validateDuration = (minutes: number, role?: string) => {
+  const validateDuration = (
+    minutes: number,
+    role?: string
+  ) => {
     if (minutes <= 0) {
-      return { valid: false, message: 'Horário de término deve ser posterior ao horário de início.' };
+      return {
+        valid: false,
+        message: 'O término deve ser posterior ao início.',
+      };
     }
+
     if (minutes < 15) {
-      return { valid: false, message: 'Duração mínima permitida: 15 minutos.' };
+      return {
+        valid: false,
+        message: 'A duração mínima é de 15 minutos.',
+      };
     }
-    const maxMinutes = role === 'Professor' || role === 'Administrator' ? 300 : 120;
-    const roleLimitDesc = role === 'Professor' ? '5 horas (Professor)' : role === 'Administrator' ? '5 horas (Admin)' : '2 horas (Estudante)';
+
+    const maxMinutes =
+      role === 'Professor' || role === 'Administrator' ? 300 : 120;
+
+    const roleLabel =
+      role === 'Professor'
+        ? 'Professor'
+        : role === 'Administrator'
+          ? 'Administrador'
+          : 'Estudante';
 
     if (minutes > maxMinutes) {
       return {
         valid: false,
-        message: `Limite excedido para ${roleLimitDesc}. Selecionado: ${Math.floor(minutes / 60)}h ${minutes % 60}m.`,
+        message: `Limite excedido: máximo de ${
+          maxMinutes / 60
+        } horas para ${roleLabel}.`,
       };
     }
 
     return {
       valid: true,
-      message: `Duração calculada: ${Math.floor(minutes / 60)}h ${minutes % 60 ? `${minutes % 60}m` : '00m'} (Permitido: máx ${roleLimitDesc})`,
+      message: `Duração: ${Math.floor(minutes / 60)}h ${String(
+        minutes % 60
+      ).padStart(2, '0')}min · Limite de ${
+        maxMinutes / 60
+      }h (${roleLabel})`,
     };
   };
 
-  const durationValidation = validateDuration(currentDurationMinutes, user?.role);
+  const durationValidation = validateDuration(
+    currentDurationMinutes,
+    user?.role
+  );
 
-  // Helper for strictly 24-hour time formatting (no AM/PM)
-  const formatTime24h = (isoString: string) => {
-    try {
-      const d = new Date(isoString);
-      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
-    } catch {
-      return isoString;
-    }
-  };
-
-  const formatDateTime24h = (isoString: string) => {
-    try {
-      const d = new Date(isoString);
-      const datePart = d.toLocaleDateString('pt-BR');
-      const timePart = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
-      return `${datePart} às ${timePart}`;
-    } catch {
-      return isoString;
-    }
-  };
-
-  // Load available rooms from Catalog for easy dropdown selection
-  useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const res = await apiRequest<any>('/api/catalog/rooms');
-        if (res.ok && res.data) {
-          const list = Array.isArray(res.data)
-            ? res.data
-            : Array.isArray(res.data.items)
-            ? res.data.items
-            : [];
-          setAvailableRooms(list);
-          if (list.length > 0 && !roomId && !selectedRoomFromCatalog) {
-            setRoomId(list[0].id);
-            checkRoomStatus(list[0].id);
-          }
-        }
-      } catch {
-        // Ignored, user can still type room UUID manually
+  const checkRoomStatus = useCallback(
+    async (targetRoomId: string) => {
+      if (!targetRoomId) {
+        setRoomStatus(null);
+        setTimeline([]);
+        return;
       }
-    };
-    fetchRooms();
-  }, []);
 
-  useEffect(() => {
-    if (selectedRoomFromCatalog) {
-      setRoomId(selectedRoomFromCatalog.id);
-      checkRoomStatus(selectedRoomFromCatalog.id);
+      setRoomStatus(null);
+      setTimeline([]);
+
+      try {
+        const statusResponse = await apiRequest<any>(
+          `/api/bookings/rooms/${targetRoomId}/status`
+        );
+
+        if (statusResponse.ok && statusResponse.data) {
+          setRoomStatus(
+            statusResponse.data.status || 'Available'
+          );
+        }
+
+        const timelineResponse = await apiRequest<any>(
+          `/api/bookings/rooms/${targetRoomId}/timeline`
+        );
+
+        if (timelineResponse.ok && timelineResponse.data) {
+          const data = timelineResponse.data;
+
+          setTimeline(
+            Array.isArray(data)
+              ? data
+              : Array.isArray(data.items)
+                ? data.items
+                : []
+          );
+        }
+      } catch (error: any) {
+        setRoomStatus(`Erro: ${error.message}`);
+        setTimeline([]);
+      }
+    },
+    []
+  );
+
+  const fetchRooms = useCallback(async () => {
+    setRoomsLoading(true);
+
+    try {
+      const response = await apiRequest<any>(
+        '/api/catalog/rooms'
+      );
+
+      if (response.ok && response.data) {
+        const data = response.data;
+
+        const roomsList: Room[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data.items)
+            ? data.items
+            : [];
+
+        setAvailableRooms(roomsList);
+
+        if (!selectedRoomFromCatalog && roomsList.length > 0) {
+          setRoomId((previous) => previous || roomsList[0].id);
+        }
+      }
+    } catch {
+      // O campo UUID permanece disponível caso
+      // o catálogo não responda.
+    } finally {
+      setRoomsLoading(false);
     }
   }, [selectedRoomFromCatalog]);
 
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     if (!user) {
       setBookings([]);
       setWaitlist([]);
       return;
     }
+
     setLoading(true);
+
     try {
-      const bResp = await apiRequest<any>('/api/bookings');
-      if (bResp.ok && bResp.data) {
-        const bList = Array.isArray(bResp.data)
-          ? bResp.data
-          : Array.isArray(bResp.data.items)
-          ? bResp.data.items
-          : [];
-        setBookings(bList);
+      const bookingsResponse = await apiRequest<any>(
+        '/api/bookings'
+      );
+
+      if (bookingsResponse.ok && bookingsResponse.data) {
+        const data = bookingsResponse.data;
+
+        setBookings(
+          Array.isArray(data)
+            ? data
+            : Array.isArray(data.items)
+              ? data.items
+              : []
+        );
       } else {
         setBookings([]);
       }
 
-      const wResp = await apiRequest<any>('/api/bookings/waitlist');
-      if (wResp.ok && wResp.data) {
-        const wList = Array.isArray(wResp.data)
-          ? wResp.data
-          : Array.isArray(wResp.data.items)
-          ? wResp.data.items
-          : [];
-        setWaitlist(wList);
+      const waitlistResponse = await apiRequest<any>(
+        '/api/bookings/waitlist'
+      );
+
+      if (waitlistResponse.ok && waitlistResponse.data) {
+        const data = waitlistResponse.data;
+
+        setWaitlist(
+          Array.isArray(data)
+            ? data
+            : Array.isArray(data.items)
+              ? data.items
+              : []
+        );
       } else {
         setWaitlist([]);
       }
-    } catch (e: any) {
-      setMessage({ text: `Erro ao carregar reservas: ${e.message}`, isError: true });
+    } catch (error: any) {
+      setMessage({
+        text: `Erro ao carregar reservas: ${error.message}`,
+        isError: true,
+      });
+
       setBookings([]);
       setWaitlist([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchRooms();
+  }, [fetchRooms]);
+
+  useEffect(() => {
+    if (selectedRoomFromCatalog) {
+      setRoomId(selectedRoomFromCatalog.id);
+    }
+  }, [selectedRoomFromCatalog]);
+
+  useEffect(() => {
+    if (roomId) {
+      checkRoomStatus(roomId);
+    }
+  }, [roomId, checkRoomStatus]);
 
   useEffect(() => {
     loadUserData();
-  }, [user]);
-
-  const checkRoomStatus = async (targetRoomId?: string) => {
-    const id = targetRoomId || roomId;
-    if (!id) return;
-    try {
-      const sResp = await apiRequest<any>(`/api/bookings/rooms/${id}/status`);
-      if (sResp.ok && sResp.data) {
-        setRoomStatus(sResp.data?.status || 'Available');
-      }
-
-      const tResp = await apiRequest<any>(`/api/bookings/rooms/${id}/timeline`);
-      if (tResp.ok && tResp.data) {
-        const tList = Array.isArray(tResp.data)
-          ? tResp.data
-          : Array.isArray(tResp.data.items)
-          ? tResp.data.items
-          : [];
-        setTimeline(tList);
-      } else {
-        setTimeline([]);
-      }
-    } catch (e: any) {
-      setRoomStatus(`Erro: ${e.message}`);
-      setTimeline([]);
-    }
-  };
+  }, [loadUserData]);
 
   const handleRoomChange = (newRoomId: string) => {
     setRoomId(newRoomId);
-    checkRoomStatus(newRoomId);
+    setMessage(null);
+  };
+
+  const refreshData = async () => {
+    await Promise.all([
+      loadUserData(),
+      fetchRooms(),
+      roomId ? checkRoomStatus(roomId) : Promise.resolve(),
+    ]);
   };
 
   const handleCreateBooking = async () => {
     if (!roomId) {
-      setMessage({ text: '⚠️ Selecione uma sala primeiro.', isError: true });
+      setMessage({
+        text: 'Selecione uma sala antes de continuar.',
+        isError: true,
+      });
       return;
     }
+
     if (!user) {
-      setMessage({ text: '⚠️ Faça login com um usuário no topo antes de reservar.', isError: true });
+      setMessage({
+        text: 'Faça login antes de realizar uma reserva.',
+        isError: true,
+      });
       return;
     }
+
     if (!durationValidation.valid) {
-      setMessage({ text: `⚠️ ${durationValidation.message}`, isError: true });
+      setMessage({
+        text: durationValidation.message,
+        isError: true,
+      });
+      return;
+    }
+
+    const startsAt = new Date(`${date}T${startTime}:00`);
+    const endsAt = new Date(`${date}T${endTime}:00`);
+
+    if (
+      Number.isNaN(startsAt.getTime()) ||
+      Number.isNaN(endsAt.getTime())
+    ) {
+      setMessage({
+        text: 'Informe uma data e horários válidos.',
+        isError: true,
+      });
       return;
     }
 
@@ -211,12 +439,15 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
     setMessage(null);
 
     try {
-      const startsAt = new Date(`${date}T${startTime}:00`);
-      const endsAt = new Date(`${date}T${endTime}:00`);
-      const selectedRoom = availableRooms.find((r) => r.id === roomId);
-      const bookingTitle = selectedRoom ? `${selectedRoom.name} (${selectedRoom.code})` : `Reserva ${purpose}`;
+      const selectedRoom = availableRooms.find(
+        (room) => room.id === roomId
+      );
 
-      const resp = await apiRequest('/api/bookings', {
+      const bookingTitle = selectedRoom
+        ? `${selectedRoom.name} (${selectedRoom.code})`
+        : `Reserva ${purpose}`;
+
+      const response = await apiRequest<any>('/api/bookings', {
         method: 'POST',
         body: JSON.stringify({
           roomId,
@@ -227,19 +458,34 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
         }),
       });
 
-      if (resp.ok) {
+      if (response.ok) {
         setMessage({
-          text: `🎉 Reserva #${resp.data?.id?.substring(0, 8)} criada com sucesso! Horário: ${startTime} às ${endTime} (24h). Código Check-in: ${resp.data?.checkInCode || 'N/A'}. Notificação enviada ao RabbitMQ.`,
-          isError: false,
+          text: `Reserva #${
+            response.data?.id?.substring(0, 8) || 'criada'
+          } confirmada! Horário: ${startTime} às ${endTime}. Código de check-in: ${
+            response.data?.checkInCode || 'N/A'
+          }.`,
         });
-        loadUserData();
-        checkRoomStatus();
+
+        await loadUserData();
+        await checkRoomStatus(roomId);
       } else {
-        const errMsg = resp.data?.detail || resp.data?.title || resp.data?.message || 'Conflito de reserva';
-        setMessage({ text: `❌ Falha: ${errMsg}`, isError: true });
+        const errorMessage =
+          response.data?.detail ||
+          response.data?.title ||
+          response.data?.message ||
+          'Conflito de reserva';
+
+        setMessage({
+          text: `Não foi possível criar a reserva: ${errorMessage}`,
+          isError: true,
+        });
       }
-    } catch (e: any) {
-      setMessage({ text: `❌ Erro: ${e.message}`, isError: true });
+    } catch (error: any) {
+      setMessage({
+        text: `Erro ao reservar: ${error.message}`,
+        isError: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -248,21 +494,42 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
   const handleCheckIn = async (booking: Booking) => {
     setLoading(true);
     setMessage(null);
+
     try {
-      const resp = await apiRequest(`/api/bookings/${booking.id}/check-in`, {
-        method: 'POST',
-        body: JSON.stringify({ checkInCode: booking.checkInCode }),
-      });
-      if (resp.ok) {
-        setMessage({ text: `✅ Check-in realizado com sucesso para a Reserva #${booking.id.substring(0, 8)}!`, isError: false });
-        loadUserData();
-        checkRoomStatus();
+      const response = await apiRequest<any>(
+        `/api/bookings/${booking.id}/check-in`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            checkInCode: booking.checkInCode,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        setMessage({
+          text: `Check-in realizado para a reserva #${booking.id.substring(
+            0,
+            8
+          )}.`,
+        });
+
+        await loadUserData();
+        await checkRoomStatus(roomId);
       } else {
-        const errMsg = resp.data?.detail || resp.data?.message || 'Falha no check-in';
-        setMessage({ text: `❌ Erro: ${errMsg}`, isError: true });
+        setMessage({
+          text:
+            response.data?.detail ||
+            response.data?.message ||
+            'Falha ao realizar check-in.',
+          isError: true,
+        });
       }
-    } catch (e: any) {
-      setMessage({ text: `❌ Erro: ${e.message}`, isError: true });
+    } catch (error: any) {
+      setMessage({
+        text: `Erro: ${error.message}`,
+        isError: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -271,18 +538,34 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
   const handleCheckOut = async (bookingId: string) => {
     setLoading(true);
     setMessage(null);
+
     try {
-      const resp = await apiRequest(`/api/bookings/${bookingId}/check-out`, { method: 'POST' });
-      if (resp.ok) {
-        setMessage({ text: `🚪 Check-out realizado para a Reserva #${bookingId.substring(0, 8)}. Sala liberada!`, isError: false });
-        loadUserData();
-        checkRoomStatus();
+      const response = await apiRequest<any>(
+        `/api/bookings/${bookingId}/check-out`,
+        { method: 'POST' }
+      );
+
+      if (response.ok) {
+        setMessage({
+          text: `Check-out realizado. A sala foi liberada.`,
+        });
+
+        await loadUserData();
+        await checkRoomStatus(roomId);
       } else {
-        const errMsg = resp.data?.detail || resp.data?.message || 'Falha no check-out';
-        setMessage({ text: `❌ Erro: ${errMsg}`, isError: true });
+        setMessage({
+          text:
+            response.data?.detail ||
+            response.data?.message ||
+            'Falha ao realizar check-out.',
+          isError: true,
+        });
       }
-    } catch (e: any) {
-      setMessage({ text: `❌ Erro: ${e.message}`, isError: true });
+    } catch (error: any) {
+      setMessage({
+        text: `Erro: ${error.message}`,
+        isError: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -291,242 +574,685 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
   const handleCancel = async (bookingId: string) => {
     setLoading(true);
     setMessage(null);
+
     try {
-      const resp = await apiRequest(`/api/bookings/${bookingId}/cancel`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: 'Cancelado pelo usuário na interface' }),
-      });
-      if (resp.ok) {
-        setMessage({ text: `🗑️ Reserva #${bookingId.substring(0, 8)} cancelada com sucesso! Vaga liberada para fila de espera.`, isError: false });
-        loadUserData();
-        checkRoomStatus();
+      const response = await apiRequest<any>(
+        `/api/bookings/${bookingId}/cancel`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            reason: 'Cancelado pelo usuário na interface',
+          }),
+        }
+      );
+
+      if (response.ok) {
+        setMessage({
+          text: `Reserva #${bookingId.substring(
+            0,
+            8
+          )} cancelada com sucesso.`,
+        });
+
+        await loadUserData();
+        await checkRoomStatus(roomId);
       } else {
-        const errMsg = resp.data?.detail || resp.data?.message || 'Falha ao cancelar';
-        setMessage({ text: `❌ Erro: ${errMsg}`, isError: true });
+        setMessage({
+          text:
+            response.data?.detail ||
+            response.data?.message ||
+            'Falha ao cancelar reserva.',
+          isError: true,
+        });
       }
-    } catch (e: any) {
-      setMessage({ text: `❌ Erro: ${e.message}`, isError: true });
+    } catch (error: any) {
+      setMessage({
+        text: `Erro: ${error.message}`,
+        isError: true,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleJoinWaitlist = async () => {
-    if (!roomId) return;
-    if (!durationValidation.valid) {
-      setMessage({ text: `⚠️ ${durationValidation.message}`, isError: true });
+    if (!roomId || !user) {
+      setMessage({
+        text: 'Faça login e selecione uma sala.',
+        isError: true,
+      });
       return;
     }
-    setLoading(true);
-    setMessage(null);
+
+    if (!durationValidation.valid) {
+      setMessage({
+        text: durationValidation.message,
+        isError: true,
+      });
+      return;
+    }
 
     const startsAt = new Date(`${date}T${startTime}:00`);
     const endsAt = new Date(`${date}T${endTime}:00`);
 
-    try {
-      const resp = await apiRequest('/api/bookings/waitlist', {
-        method: 'POST',
-        body: JSON.stringify({
-          roomId,
-          startsAtUtc: startsAt.toISOString(),
-          endsAtUtc: endsAt.toISOString(),
-        }),
+    if (
+      Number.isNaN(startsAt.getTime()) ||
+      Number.isNaN(endsAt.getTime())
+    ) {
+      setMessage({
+        text: 'Informe uma data e horários válidos.',
+        isError: true,
       });
+      return;
+    }
 
-      if (resp.ok) {
-        setMessage({ text: `📋 Você entrou na Fila de Espera para o horário! Notificação automática será disparada se houver cancelamento.`, isError: false });
-        loadUserData();
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await apiRequest<any>(
+        '/api/bookings/waitlist',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            roomId,
+            startsAtUtc: startsAt.toISOString(),
+            endsAtUtc: endsAt.toISOString(),
+          }),
+        }
+      );
+
+      if (response.ok) {
+        setMessage({
+          text:
+            'Você entrou na fila de espera para o horário selecionado.',
+        });
+
+        await loadUserData();
       } else {
-        const errMsg = resp.data?.detail || resp.data?.message || 'Falha ao entrar na fila';
-        setMessage({ text: `❌ Falha: ${errMsg}`, isError: true });
+        setMessage({
+          text:
+            response.data?.detail ||
+            response.data?.message ||
+            'Falha ao entrar na fila de espera.',
+          isError: true,
+        });
       }
-    } catch (e: any) {
-      setMessage({ text: `❌ Erro: ${e.message}`, isError: true });
+    } catch (error: any) {
+      setMessage({
+        text: `Erro: ${error.message}`,
+        isError: true,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleLoadOccupancy = async () => {
+    setReportLoading(true);
+
     try {
-      const resp = await apiRequest('/api/bookings/reports/occupancy');
-      if (resp.ok) {
-        setOccupancyReport(resp.data);
+      const response = await apiRequest<any>(
+        '/api/bookings/reports/occupancy'
+      );
+
+      if (response.ok) {
+        setOccupancyReport(response.data);
+      } else {
+        setMessage({
+          text: 'Não foi possível carregar o relatório.',
+          isError: true,
+        });
       }
-    } catch (e: any) {
-      setMessage({ text: `Erro ao carregar relatório: ${e.message}`, isError: true });
+    } catch (error: any) {
+      setMessage({
+        text: `Erro ao carregar relatório: ${error.message}`,
+        isError: true,
+      });
+    } finally {
+      setReportLoading(false);
     }
   };
 
   const safeBookings = Array.isArray(bookings) ? bookings : [];
   const safeTimeline = Array.isArray(timeline) ? timeline : [];
+  const safeWaitlist = Array.isArray(waitlist) ? waitlist : [];
+
+  const activeBookings = safeBookings.filter((booking) =>
+    ['confirmed', 'checkedin', 'pending'].includes(
+      normalizeStatus(booking.status)
+    )
+  );
+
+  const historyBookings = safeBookings.filter(
+    (booking) =>
+      !['confirmed', 'checkedin', 'pending'].includes(
+        normalizeStatus(booking.status)
+      )
+  );
+
+  const selectedRoom = availableRooms.find(
+    (room) => room.id === roomId
+  );
+
+  const renderBookingCard = (booking: Booking) => (
+    <article className="booking-item" key={booking.id}>
+      <div className="booking-item-header">
+        <div className="booking-item-identity">
+          <div className="booking-item-icon">
+            <FontAwesomeIcon icon={faCalendarDays} />
+          </div>
+
+          <div>
+            <span className="booking-item-label">
+              RESERVA
+            </span>
+            <h4>#{booking.id.substring(0, 8)}</h4>
+          </div>
+        </div>
+
+        <span
+          className={`booking-status booking-status-${getStatusClass(
+            booking.status
+          )}`}
+        >
+          <span className="booking-status-dot" />
+          {getStatusLabel(booking.status)}
+        </span>
+      </div>
+
+      <div className="booking-item-schedule">
+        <FontAwesomeIcon icon={faClock} />
+        <span>
+          {formatDateTime24h(booking.startsAtUtc)}
+          {' — '}
+          {formatTime24h(booking.endsAtUtc)}
+        </span>
+      </div>
+
+      {booking.checkInCode && (
+        <div className="booking-checkin-code">
+          <div>
+            <FontAwesomeIcon icon={faTicket} />
+            <span>Código de check-in</span>
+          </div>
+
+          <strong>{booking.checkInCode}</strong>
+        </div>
+      )}
+
+      {(booking.status === 'Confirmed' ||
+        booking.status === 'CheckedIn') && (
+        <div className="booking-item-actions">
+          {booking.status === 'Confirmed' && (
+            <button
+              type="button"
+              className="btn-success btn-sm"
+              disabled={loading}
+              onClick={() => handleCheckIn(booking)}
+            >
+              <FontAwesomeIcon icon={faRightToBracket} />
+              Check-in
+            </button>
+          )}
+
+          {booking.status === 'CheckedIn' && (
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              disabled={loading}
+              onClick={() => handleCheckOut(booking.id)}
+            >
+              <FontAwesomeIcon icon={faRightFromBracket} />
+              Check-out
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="btn-danger btn-sm"
+            disabled={loading}
+            onClick={() => handleCancel(booking.id)}
+          >
+            <FontAwesomeIcon icon={faTrashCan} />
+            Cancelar
+          </button>
+        </div>
+      )}
+    </article>
+  );
 
   return (
-    <div className="section-card">
-      <div className="card-header">
-        <div>
-          <h3>📅 Motor de Reservas e Conflitos (Studium-Booking — 3 Réplicas EKS)</h3>
-          <p className="hint">
-            Prevenção de double-booking via <code>tstzrange</code> GiST no PostgreSQL, check-in por QR Code e fila de espera.
-          </p>
+    <section className="section-card booking-section">
+      {/* HEADER */}
+      <div className="card-header booking-header">
+        <div className="booking-heading">
+          <div className="booking-heading-icon">
+            <FontAwesomeIcon icon={faCalendarDays} />
+          </div>
+
+          <div>
+            <span className="booking-eyebrow">
+              STUDIUM BOOKING SERVICE
+            </span>
+
+            <h2>Reservas & Agendamentos</h2>
+
+            <p className="hint">
+              Gerencie reservas, conflitos e disponibilidade
+              dos espaços institucionais.
+            </p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={handleLoadOccupancy} className="btn-secondary btn-sm">
-            📊 Relatório Ocupação
+
+        <div className="booking-header-actions">
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={handleLoadOccupancy}
+            disabled={reportLoading}
+          >
+            <FontAwesomeIcon
+              icon={reportLoading ? faSpinner : faChartColumn}
+              spin={reportLoading}
+            />
+            Relatório de ocupação
           </button>
-          <button onClick={loadUserData} disabled={loading} className="btn-secondary btn-sm">
-            {loading ? 'Carregando...' : '🔄 Atualizar'}
+
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={refreshData}
+            disabled={loading || roomsLoading}
+          >
+            <FontAwesomeIcon
+              icon={loading ? faSpinner : faRotate}
+              spin={loading}
+            />
+            Atualizar
           </button>
         </div>
       </div>
 
+      {/* ARQUITETURA */}
+      <div className="booking-architecture">
+        <span>
+          <FontAwesomeIcon icon={faShieldHalved} />
+          Prevenção de conflitos
+        </span>
+
+        <span>
+          <FontAwesomeIcon icon={faBuilding} />
+          PostgreSQL GiST
+        </span>
+
+        <span>
+          <FontAwesomeIcon icon={faLayerGroup} />
+          3 réplicas EKS
+        </span>
+      </div>
+
+      {/* MENSAGENS */}
       {message && (
-        <div className={`alert ${message.isError ? 'alert-error' : 'alert-success'}`}>
-          {message.text}
+        <div
+          className={`booking-feedback ${
+            message.isError
+              ? 'booking-feedback-error'
+              : 'booking-feedback-success'
+          }`}
+          role="alert"
+        >
+          <FontAwesomeIcon
+            icon={
+              message.isError
+                ? faCircleExclamation
+                : faCircleCheck
+            }
+          />
+
+          <span>{message.text}</span>
+
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            aria-label="Fechar mensagem"
+          >
+            ×
+          </button>
         </div>
       )}
 
+      {/* RELATÓRIO */}
       {occupancyReport && (
-        <div className="stats-box" style={{ marginBottom: '16px' }}>
-          <div className="stat-item">
-            <span className="stat-num">{occupancyReport.totalBookings || 0}</span>
-            <span className="stat-desc">Total Reservas</span>
+        <div className="booking-report">
+          <div className="booking-panel-title">
+            <div>
+              <h3>
+                <FontAwesomeIcon icon={faChartPie} />
+                Relatório de ocupação
+              </h3>
+              <p>Indicadores operacionais do serviço.</p>
+            </div>
           </div>
-          <div className="stat-item">
-            <span className="stat-num">{((occupancyReport.checkInRate || 0) * 100).toFixed(0)}%</span>
-            <span className="stat-desc">Taxa Check-in</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-num">{((occupancyReport.noShowRate || 0) * 100).toFixed(0)}%</span>
-            <span className="stat-desc">Taxa No-Show</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-num">{(occupancyReport.totalBookedHours || 0).toFixed(1)}h</span>
-            <span className="stat-desc">Horas Alocadas</span>
+
+          <div className="booking-stats">
+            <div className="booking-stat-card">
+              <div className="booking-stat-icon">
+                <FontAwesomeIcon icon={faCalendarDays} />
+              </div>
+              <span>Total de reservas</span>
+              <strong>
+                {occupancyReport.totalBookings || 0}
+              </strong>
+            </div>
+
+            <div className="booking-stat-card">
+              <div className="booking-stat-icon">
+                <FontAwesomeIcon icon={faClipboardCheck} />
+              </div>
+              <span>Taxa de check-in</span>
+              <strong>
+                {(
+                  (occupancyReport.checkInRate || 0) * 100
+                ).toFixed(0)}
+                %
+              </strong>
+            </div>
+
+            <div className="booking-stat-card">
+              <div className="booking-stat-icon">
+                <FontAwesomeIcon icon={faUsers} />
+              </div>
+              <span>Taxa de no-show</span>
+              <strong>
+                {(
+                  (occupancyReport.noShowRate || 0) * 100
+                ).toFixed(0)}
+                %
+              </strong>
+            </div>
+
+            <div className="booking-stat-card">
+              <div className="booking-stat-icon">
+                <FontAwesomeIcon icon={faHourglassHalf} />
+              </div>
+              <span>Horas alocadas</span>
+              <strong>
+                {Number(
+                  occupancyReport.totalBookedHours || 0
+                ).toFixed(1)}
+                h
+              </strong>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="grid-cards" style={{ gridTemplateColumns: '1.2fr 1fr' }}>
-        {/* Reservation Creation Box */}
-        <div className="sub-card">
-          <h4>Nova Reserva & Agendamento (24h)</h4>
+      {/* LAYOUT PRINCIPAL */}
+      <div className="booking-layout">
+        {/* FORMULÁRIO */}
+        <div className="booking-form-panel">
+          <div className="booking-panel-title">
+            <div>
+              <h3>
+                <FontAwesomeIcon icon={faCalendarPlus} />
+                Nova reserva
+              </h3>
 
-          {/* Room Selector Dropdown */}
-          <div className="form-group">
-            <label>Selecionar Sala:</label>
-            {availableRooms.length > 0 ? (
-              <select
-                value={roomId}
-                onChange={(e) => handleRoomChange(e.target.value)}
-                className="full-width"
-              >
-                {availableRooms.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name} ({r.code}) — Andar {r.floor}, Cap. {r.capacity}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  placeholder="ID da Sala (UUID)"
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
-                  className="full-width"
-                />
-                <button onClick={() => checkRoomStatus()} className="btn-secondary btn-sm">
-                  🔍 Status
-                </button>
-              </div>
-            )}
-          </div>
-
-          {roomStatus && (
-            <div style={{ margin: '8px 0', fontSize: '0.85rem' }}>
-              Status da Sala: <span className={`badge ${roomStatus === 'Available' ? 'badge-success' : 'badge-warning'}`}>{roomStatus}</span>
+              <p>
+                Selecione uma sala e defina o período.
+              </p>
             </div>
-          )}
 
-          {/* Date and 24h Time pickers */}
-          <div className="form-row">
-            <label>
-              Data:
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                style={{ marginLeft: '6px' }}
-                required
-              />
-            </label>
-            <label>
-              Início (24h):
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                style={{ marginLeft: '6px', width: '105px' }}
-                required
-              />
-            </label>
-            <label>
-              Término (24h):
-              <input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                style={{ marginLeft: '6px', width: '105px' }}
-                required
-              />
-            </label>
-          </div>
-
-          {/* Dynamic Duration Validation Status */}
-          <div style={{ margin: '8px 0', fontSize: '0.82rem' }}>
-            <span className={`badge ${durationValidation.valid ? 'badge-success' : 'badge-danger'}`}>
-              {durationValidation.message}
+            <span className="booking-panel-tag">
+              Formato 24h
             </span>
           </div>
 
-          <div className="form-group" style={{ marginTop: '8px' }}>
-            <label>Finalidade:</label>
-            <input
-              type="text"
-              value={purpose}
-              onChange={(e) => setPurpose(e.target.value)}
-              className="full-width"
-            />
+          <div className="booking-form-content">
+            <div className="booking-form-group">
+              <label htmlFor="booking-room">
+                Sala institucional
+              </label>
+
+              {availableRooms.length > 0 ? (
+                <select
+                  id="booking-room"
+                  value={roomId}
+                  onChange={(event) =>
+                    handleRoomChange(event.target.value)
+                  }
+                  className="booking-input"
+                >
+                  {availableRooms.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.name} ({room.code}) — Andar{' '}
+                      {room.floor}, Cap. {room.capacity}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="booking-room-fallback">
+                  <input
+                    id="booking-room"
+                    type="text"
+                    placeholder="ID da sala (UUID)"
+                    value={roomId}
+                    onChange={(event) =>
+                      handleRoomChange(event.target.value)
+                    }
+                    className="booking-input"
+                  />
+
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => checkRoomStatus(roomId)}
+                  >
+                    <FontAwesomeIcon
+                      icon={faMagnifyingGlass}
+                    />
+                    Status
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {selectedRoom && (
+              <div className="booking-selected-room">
+                <div className="booking-selected-room-icon">
+                  <FontAwesomeIcon icon={faDoorOpen} />
+                </div>
+
+                <div>
+                  <strong>{selectedRoom.name}</strong>
+                  <span>
+                    <FontAwesomeIcon icon={faUsers} />
+                    {selectedRoom.capacity} pessoas
+                    <span className="booking-meta-separator">
+                      ·
+                    </span>
+                    Andar {selectedRoom.floor}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {roomStatus && (
+              <div className="booking-room-status-row">
+                <span>Status da sala</span>
+
+                <span
+                  className={`booking-status booking-status-${getStatusClass(
+                    roomStatus
+                  )}`}
+                >
+                  <span className="booking-status-dot" />
+                  {getStatusLabel(roomStatus)}
+                </span>
+              </div>
+            )}
+
+            <div className="booking-form-divider" />
+
+            <div className="booking-date-grid">
+              <div className="booking-form-group">
+                <label htmlFor="booking-date">
+                  Data da reserva
+                </label>
+
+                <input
+                  id="booking-date"
+                  type="date"
+                  value={date}
+                  onChange={(event) =>
+                    setDate(event.target.value)
+                  }
+                  className="booking-input"
+                  required
+                />
+              </div>
+
+              <div className="booking-form-group">
+                <label htmlFor="booking-start">
+                  Horário de início
+                </label>
+
+                <input
+                  id="booking-start"
+                  type="time"
+                  value={startTime}
+                  onChange={(event) =>
+                    setStartTime(event.target.value)
+                  }
+                  className="booking-input"
+                  required
+                />
+              </div>
+
+              <div className="booking-form-group">
+                <label htmlFor="booking-end">
+                  Horário de término
+                </label>
+
+                <input
+                  id="booking-end"
+                  type="time"
+                  value={endTime}
+                  onChange={(event) =>
+                    setEndTime(event.target.value)
+                  }
+                  className="booking-input"
+                  required
+                />
+              </div>
+            </div>
+
+            <div
+              className={`booking-duration ${
+                durationValidation.valid
+                  ? 'booking-duration-valid'
+                  : 'booking-duration-invalid'
+              }`}
+            >
+              <FontAwesomeIcon
+                icon={
+                  durationValidation.valid
+                    ? faCircleCheck
+                    : faCircleExclamation
+                }
+              />
+
+              <span>{durationValidation.message}</span>
+            </div>
+
+            <div className="booking-form-group">
+              <label htmlFor="booking-purpose">
+                Finalidade da reserva
+              </label>
+
+              <input
+                id="booking-purpose"
+                type="text"
+                value={purpose}
+                onChange={(event) =>
+                  setPurpose(event.target.value)
+                }
+                placeholder="Ex: Grupo de estudos"
+                className="booking-input"
+              />
+            </div>
+
+            <div className="booking-form-actions">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={
+                  loading ||
+                  !roomId ||
+                  !durationValidation.valid
+                }
+                onClick={handleCreateBooking}
+              >
+                <FontAwesomeIcon
+                  icon={loading ? faSpinner : faCalendarPlus}
+                  spin={loading}
+                />
+                Confirmar reserva
+              </button>
+
+              <button
+                type="button"
+                className="btn-warning btn-sm"
+                disabled={
+                  loading ||
+                  !roomId ||
+                  !durationValidation.valid
+                }
+                onClick={handleJoinWaitlist}
+              >
+                <FontAwesomeIcon icon={faListOl} />
+                Fila de espera
+              </button>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button
-              onClick={handleCreateBooking}
-              disabled={loading || !roomId || !durationValidation.valid}
-              className="btn-primary"
-            >
-              📅 Confirmar Reserva
-            </button>
-            <button
-              onClick={handleJoinWaitlist}
-              disabled={loading || !roomId || !durationValidation.valid}
-              className="btn-warning btn-sm"
-            >
-              📋 Fila de Espera
-            </button>
-          </div>
-
-          {/* Timeline Visualizer in 24h */}
+          {/* LINHA DO TEMPO */}
           {safeTimeline.length > 0 && (
-            <div className="card-subpanel mt-4">
-              <strong className="text-xs">Grade de Horários da Sala (24h):</strong>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                {safeTimeline.slice(0, 5).map((slot, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', padding: '4px 8px', background: '#ffffff', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                    <span>{formatTime24h(slot.startsAtUtc)} às {formatTime24h(slot.endsAtUtc)} (24h)</span>
-                    <span className={`badge ${slot.status === 'Available' ? 'badge-success' : slot.status === 'Maintenance' ? 'badge-danger' : 'badge-warning'}`}>
-                      {slot.status}
+            <div className="booking-timeline-panel">
+              <div className="booking-panel-title">
+                <div>
+                  <h3>
+                    <FontAwesomeIcon icon={faClock} />
+                    Grade de horários
+                  </h3>
+                  <p>Ocupação registrada para a sala.</p>
+                </div>
+              </div>
+
+              <div className="booking-timeline-list">
+                {safeTimeline.slice(0, 5).map((slot, index) => (
+                  <div
+                    className="booking-timeline-item"
+                    key={index}
+                  >
+                    <div className="booking-timeline-time">
+                      <FontAwesomeIcon icon={faClock} />
+
+                      <span>
+                        {formatTime24h(slot.startsAtUtc)}
+                        {' — '}
+                        {formatTime24h(slot.endsAtUtc)}
+                      </span>
+                    </div>
+
+                    <span
+                      className={`booking-status booking-status-${getStatusClass(
+                        slot.status
+                      )}`}
+                    >
+                      <span className="booking-status-dot" />
+                      {getStatusLabel(slot.status)}
                     </span>
                   </div>
                 ))}
@@ -535,74 +1261,104 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ user, selectedRo
           )}
         </div>
 
-        {/* My Active Bookings in 24h */}
-        <div className="sub-card">
-          <h4>Minhas Reservas Ativas ({safeBookings.length})</h4>
-          <div className="bookings-scroll-list" style={{ maxHeight: '420px', overflowY: 'auto' }}>
-            {safeBookings.length > 0 ? (
-              safeBookings.map((b) => (
-                <div
-                  key={b.id}
-                  style={{
-                    padding: '12px',
-                    borderBottom: '1px solid #e2e8f0',
-                    background: '#ffffff',
-                    borderRadius: '6px',
-                    marginBottom: '8px',
-                    border: '1px solid #e2e8f0',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong>Reserva #{b.id.substring(0, 8)}</strong>
-                    <span className={`badge ${b.status === 'Confirmed' ? 'badge-info' : b.status === 'CheckedIn' ? 'badge-success' : 'badge-secondary'}`}>
-                      {b.status}
-                    </span>
-                  </div>
-                  <div className="text-muted text-xs" style={{ margin: '6px 0' }}>
-                    Horário: {formatDateTime24h(b.startsAtUtc)} até {formatTime24h(b.endsAtUtc)} (24h)
-                  </div>
-                  {b.checkInCode && (
-                    <div style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', marginBottom: '8px' }}>
-                      Código de Check-in: <strong><code>{b.checkInCode}</code></strong>
-                    </div>
-                  )}
+        {/* MINHAS RESERVAS */}
+        <div className="booking-list-panel">
+          <div className="booking-panel-title">
+            <div>
+              <h3>
+                <FontAwesomeIcon icon={faCalendarDays} />
+                Minhas reservas
+              </h3>
 
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {b.status === 'Confirmed' && (
-                      <button
-                        onClick={() => handleCheckIn(b)}
-                        className="btn-success btn-xs"
-                      >
-                        Check-in ✅
-                      </button>
-                    )}
-                    {b.status === 'CheckedIn' && (
-                      <button
-                        onClick={() => handleCheckOut(b.id)}
-                        className="btn-secondary btn-xs"
-                      >
-                        Check-out 🚪
-                      </button>
-                    )}
-                    {(b.status === 'Confirmed' || b.status === 'CheckedIn') && (
-                      <button
-                        onClick={() => handleCancel(b.id)}
-                        className="btn-danger btn-xs"
-                      >
-                        Cancelar 🗑️
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-muted text-sm" style={{ padding: '24px 0', textAlign: 'center' }}>
-                Nenhuma reserva ativa encontrada para este usuário.
+              <p>
+                Acompanhe seus agendamentos e check-ins.
               </p>
+            </div>
+
+            <span className="booking-count">
+              {activeBookings.length} ativas
+            </span>
+          </div>
+
+          <div className="booking-list-summary">
+            <div>
+              <span>Reservas em andamento</span>
+              <strong>{activeBookings.length}</strong>
+            </div>
+
+            <div>
+              <span>Histórico</span>
+              <strong>{historyBookings.length}</strong>
+            </div>
+
+            <div>
+              <span>Fila de espera</span>
+              <strong>{safeWaitlist.length}</strong>
+            </div>
+          </div>
+
+          <div className="bookings-scroll-list">
+            {activeBookings.length > 0 ? (
+              activeBookings.map(renderBookingCard)
+            ) : (
+              <div className="booking-empty">
+                <FontAwesomeIcon icon={faInbox} />
+
+                <h4>Nenhuma reserva ativa</h4>
+
+                <p>
+                  Suas reservas confirmadas aparecerão aqui.
+                </p>
+              </div>
             )}
+          </div>
+
+          {historyBookings.length > 0 && (
+            <div className="booking-history">
+              <button
+                type="button"
+                className="booking-history-toggle"
+                onClick={() =>
+                  setShowHistory((previous) => !previous)
+                }
+                aria-expanded={showHistory}
+              >
+                <span>
+                  <FontAwesomeIcon icon={faClock} />
+                  Histórico de reservas
+                  <span className="booking-history-count">
+                    {historyBookings.length}
+                  </span>
+                </span>
+
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  className={
+                    showHistory ? 'booking-chevron-open' : ''
+                  }
+                />
+              </button>
+
+              {showHistory && (
+                <div className="booking-history-list">
+                  {historyBookings.map(renderBookingCard)}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="booking-list-footer">
+            <FontAwesomeIcon icon={faCircleInfo} />
+
+            <span>
+              Os agendamentos são validados pelo serviço
+              Studium-Booking para evitar conflitos de horário.
+            </span>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
+
+export default BookingSection;
